@@ -1,0 +1,2520 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5枚カード式バトル</title>
+<style>
+:root{
+  --bg:#0f1220;--panel:#181d31;--card:#222945;--text:#f7f8ff;
+  --muted:#aeb7d1;--border:#3a456d;--accent:#7183ff;--ok:#62d49f;
+  --bad:#ff6b7d;--warn:#f4c95d;--special:#b38cff;--common:#9aa4b2;--rare:#4da3ff;--epic:#b56cff;--legendary:#ffb84d;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;
+  background:linear-gradient(180deg,#0d1020,#13182a);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+button{font:inherit}
+main{width:min(1480px,calc(100% - 24px));margin:24px auto 48px}
+h1{margin:0 0 18px;font-size:clamp(25px,5vw,38px)}
+h2{margin-top:0}
+.hidden{display:none!important}
+
+.start-screen{
+  min-height:70vh;
+  display:grid;
+  place-items:center;
+}
+.start-card{
+  width:min(700px,100%);
+  padding:28px;
+  border:1px solid var(--border);
+  border-radius:24px;
+  background:var(--panel);
+}
+.start-card p,.start-card li{color:var(--muted);line-height:1.7}
+.start-card ul{padding-left:22px}
+.start-button{
+  width:100%;
+  padding:16px;
+  border:0;
+  border-radius:16px;
+  background:var(--accent);
+  color:white;
+  font-weight:800;
+  font-size:20px;
+  cursor:pointer;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  margin-bottom:14px
+}
+.stat,.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:18px
+}
+.stat{text-align:center;padding:13px}
+.stat small{display:block;color:var(--muted)}
+.stat strong{display:block;font-size:26px;margin-top:4px}
+.panel{padding:16px;margin-bottom:14px}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:12px
+}
+.cardbtn{
+  min-height:150px;
+  border:2px solid var(--border);
+  border-radius:18px;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,0)),
+    var(--card);
+  color:var(--text);
+  font-size:38px;
+  font-weight:800;
+  cursor:grab;
+  position:relative;
+  overflow:hidden;
+  transition:transform .12s ease,border-color .12s ease,opacity .12s ease;
+  user-select:none;
+}
+.cardbtn:active{cursor:grabbing}
+.cardbtn::before{
+  content:"";
+  position:absolute;
+  inset:8px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:12px;
+  pointer-events:none;
+}
+.cardbtn:hover:not(:disabled){transform:translateY(-3px);border-color:var(--accent)}
+.cardbtn.dragging{opacity:.35}
+.cardbtn.drop-target{border-color:var(--warn)}
+.cardbtn:disabled{opacity:.35;cursor:not-allowed}
+.cardbtn.used{opacity:.28}
+.cardtype{
+  position:absolute;top:12px;left:14px;
+  font-size:11px;letter-spacing:.08em;
+  color:var(--muted);font-weight:600;
+}
+.cardfoot{
+  position:absolute;bottom:12px;right:14px;
+  font-size:11px;color:var(--muted);font-weight:500;
+}
+
+.expression{
+  min-height:78px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  flex-wrap:wrap;
+  border:1px solid var(--border);
+  border-radius:15px;
+  margin:12px 0;
+  padding:10px;
+  font-size:30px
+}
+.token{
+  padding:8px 12px;
+  border-radius:12px;
+  background:#30395c;
+  cursor:grab;
+  user-select:none;
+}
+.token.dragging{opacity:.35}
+.token.drop-target{outline:2px solid var(--warn)}
+
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+button.action{
+  padding:13px;border-radius:14px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);cursor:pointer
+}
+button.primary{background:var(--accent);border-color:var(--accent)}
+button.warn{background:#564819;border-color:var(--warn)}
+button:disabled{opacity:.45;cursor:not-allowed}
+
+.message{
+  padding:14px;border-radius:14px;background:#252d4c;
+  margin-bottom:14px;min-height:52px
+}
+.message.ok{border:1px solid var(--ok)}
+.message.bad{border:1px solid var(--bad)}
+.message.warn{border:1px solid var(--warn)}
+.help{color:var(--muted);font-size:13px;margin:9px 0 0}
+
+.bar{height:12px;background:#2a3150;border-radius:999px;overflow:hidden;margin-top:8px}
+.bar>div{height:100%;width:100%;transition:width .25s ease}
+.hpfill{background:var(--ok)}
+.timefill{background:var(--accent)}
+.timefill.danger{background:var(--bad)}
+
+.specials{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px
+}
+.special-card{
+  min-height:120px;
+  border:2px solid #6f57a7;
+  border-radius:16px;
+  padding:14px;
+  background:
+    linear-gradient(145deg,rgba(179,140,255,.18),rgba(179,140,255,.03)),
+    #251f39;
+}
+.special-card strong{display:block;font-size:18px;margin-bottom:8px}
+.special-card small{color:var(--muted);line-height:1.5}
+
+.special-modal{
+  position:fixed;
+  inset:0;
+  background:rgba(4,6,14,.78);
+  display:grid;
+  place-items:center;
+  padding:18px;
+  z-index:20;
+}
+.special-modal-card{
+  width:min(520px,100%);
+  border:2px solid var(--special);
+  border-radius:22px;
+  padding:24px;
+  background:#211a36;
+  text-align:center;
+}
+.special-reward{
+  margin:18px 0;
+  padding:24px;
+  border:1px solid #765fb1;
+  border-radius:18px;
+  background:rgba(179,140,255,.1);
+}
+.special-reward .icon{font-size:42px}
+.special-reward strong{display:block;font-size:24px;margin:8px 0}
+.special-reward p{color:var(--muted)}
+.special-modal-card button{
+  width:100%;padding:14px;border:0;border-radius:14px;
+  background:var(--special);color:white;font-weight:800;cursor:pointer;
+}
+
+.gameover{
+  display:none;padding:20px;border:1px solid var(--bad);
+  border-radius:18px;background:#351f2a;text-align:center;margin-bottom:14px
+}
+.gameover.show{display:block}
+
+@media(max-width:820px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stats .stat:last-child{grid-column:1/-1}
+  .cards{grid-template-columns:repeat(3,1fr)}
+  .specials{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:520px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .actions{grid-template-columns:1fr}
+  .specials{grid-template-columns:1fr}
+  .cardbtn{min-height:130px}
+}
+
+.game-layout{
+  display:grid;
+  grid-template-columns:220px minmax(0,1fr) 250px;
+  gap:14px;
+  align-items:start;
+}
+.rarity-guide{
+  position:sticky;
+  top:14px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:16px;
+}
+.rarity-guide h2{font-size:18px;margin-bottom:8px}
+.rarity-guide>p{color:var(--muted);font-size:13px;line-height:1.5}
+.rarity-pyramid{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  margin:16px 0;
+}
+.pyramid-tier{
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:8px;
+  color:white;
+  font-size:12px;
+  font-weight:800;
+  text-align:center;
+  border:1px solid rgba(255,255,255,.18);
+}
+.pyramid-tier.legendary{width:42%;background:var(--legendary);color:#251704}
+.pyramid-tier.epic{width:62%;background:var(--epic)}
+.pyramid-tier.rare{width:81%;background:var(--rare)}
+.pyramid-tier.common{width:100%;background:var(--common);color:#18202d}
+.rarity-legend{display:grid;gap:8px}
+.rarity-row{
+  display:grid;
+  grid-template-columns:12px 1fr auto;
+  gap:8px;
+  align-items:center;
+  font-size:12px;
+}
+.rarity-dot{width:12px;height:12px;border-radius:3px}
+.rarity-row small{color:var(--muted)}
+.game-main{min-width:0}
+.rarity-badge{
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  margin-bottom:8px;
+}
+.rarity-common{border-color:var(--common)!important}
+.rarity-common .rarity-badge{background:var(--common);color:#16202d}
+.rarity-rare{border-color:var(--rare)!important}
+.rarity-rare .rarity-badge{background:var(--rare);color:white}
+.rarity-epic{border-color:var(--epic)!important}
+.rarity-epic .rarity-badge{background:var(--epic);color:white}
+.rarity-legendary{
+  border-color:var(--legendary)!important;
+  background:
+    linear-gradient(145deg,rgba(255,184,77,.22),rgba(179,140,255,.08)),
+    #2a2236!important;
+}
+.rarity-legendary .rarity-badge{background:var(--legendary);color:#2d1a00}
+.reward-rarity{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  margin-top:8px;
+}
+@media(max-width:900px){
+  .game-layout{grid-template-columns:1fr}
+  .rarity-guide{position:static}
+  .rarity-pyramid{max-width:420px;margin-left:auto;margin-right:auto}
+}
+
+
+:root{
+  --r1:#6f6257;--r2:#939aa3;--r3:#5fae72;--r4:#4d92e8;--r5:#7f6cf2;
+  --r6:#b05bea;--r7:#f2a03d;--r8:#f4de72;--r9:#7ee7ff;--r10:#ff75d8;
+}
+.pyramid-tier{font-size:10px;height:31px}
+.pyramid-tier.r10{width:28%;background:var(--r10)}
+.pyramid-tier.r9{width:36%;background:var(--r9);color:#08202a}
+.pyramid-tier.r8{width:44%;background:var(--r8);color:#2a2205}
+.pyramid-tier.r7{width:52%;background:var(--r7);color:#291a03}
+.pyramid-tier.r6{width:60%;background:var(--r6)}
+.pyramid-tier.r5{width:68%;background:var(--r5)}
+.pyramid-tier.r4{width:76%;background:var(--r4)}
+.pyramid-tier.r3{width:84%;background:var(--r3)}
+.pyramid-tier.r2{width:92%;background:var(--r2);color:#19212a}
+.pyramid-tier.r1{width:100%;background:var(--r1);color:#f0e8dd}
+.rarity-dot.r1{background:var(--r1)} .rarity-dot.r2{background:var(--r2)}
+.rarity-dot.r3{background:var(--r3)} .rarity-dot.r4{background:var(--r4)}
+.rarity-dot.r5{background:var(--r5)} .rarity-dot.r6{background:var(--r6)}
+.rarity-dot.r7{background:var(--r7)} .rarity-dot.r8{background:var(--r8)}
+.rarity-dot.r9{background:var(--r9)} .rarity-dot.r10{background:var(--r10)}
+.special-card.r1{border-color:var(--r1);background:#29241f;filter:saturate(.55)}
+.special-card.r2{border-color:var(--r2);background:#2a2d31}
+.special-card.r3{border-color:var(--r3);background:#1f3025}
+.special-card.r4{border-color:var(--r4);background:#1d2a3c}
+.special-card.r5{border-color:var(--r5);background:#26213c}
+.special-card.r6{border-color:var(--r6);background:#30203b}
+.special-card.r7{border-color:var(--r7);background:#3a2a18}
+.special-card.r8,.special-card.r9,.special-card.r10{
+  position:relative;overflow:hidden
+}
+.special-card.r8{border-color:var(--r8);background:#3a351e}
+.special-card.r9{border-color:var(--r9);background:#18323a}
+.special-card.r10{border-color:var(--r10);background:#3a1832}
+.special-card.r1::after{
+  content:"しょぼい";position:absolute;right:8px;bottom:6px;font-size:10px;
+  color:#8f8175;transform:rotate(-8deg)
+}
+.special-card.r8::before,.special-card.r9::before,.special-card.r10::before{
+  content:"";position:absolute;inset:-60% -20%;
+  background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.35),transparent 65%);
+  animation:shine 2.8s linear infinite;
+}
+.special-card.r9{animation:floatGlow 2.4s ease-in-out infinite}
+.special-card.r10{animation:mythicPulse 1.8s ease-in-out infinite}
+@keyframes shine{from{transform:translateX(-60%) rotate(8deg)}to{transform:translateX(60%) rotate(8deg)}}
+@keyframes floatGlow{0%,100%{box-shadow:0 0 0 rgba(126,231,255,0)}50%{box-shadow:0 0 18px rgba(126,231,255,.45)}}
+@keyframes mythicPulse{0%,100%{box-shadow:0 0 10px rgba(255,117,216,.25)}50%{box-shadow:0 0 28px rgba(255,117,216,.75)}}
+.rarity-badge.r1{background:var(--r1)} .rarity-badge.r2{background:var(--r2);color:#111}
+.rarity-badge.r3{background:var(--r3)} .rarity-badge.r4{background:var(--r4)}
+.rarity-badge.r5{background:var(--r5)} .rarity-badge.r6{background:var(--r6)}
+.rarity-badge.r7{background:var(--r7);color:#241603} .rarity-badge.r8{background:var(--r8);color:#2b2304}
+.rarity-badge.r9{background:var(--r9);color:#08202a} .rarity-badge.r10{background:var(--r10)}
+.history-panel{
+  position:sticky;top:14px;background:var(--panel);border:1px solid var(--border);
+  border-radius:18px;padding:16px;max-height:calc(100vh - 28px);overflow:auto
+}
+.history-panel h2{font-size:18px}
+.history-list{display:grid;gap:8px}
+.history-item{
+  border:1px solid var(--border);border-radius:12px;padding:10px;background:#20263d
+}
+.history-item strong{display:block;margin-bottom:4px}
+.history-item small{display:block;color:var(--muted);line-height:1.45}
+.history-item.success{border-color:var(--ok)}
+.history-item.fail{border-color:var(--bad)}
+.history-item.reward{border-color:var(--special)}
+.history-empty{color:var(--muted);font-size:13px}
+@media(max-width:1100px){
+  .game-layout{grid-template-columns:220px minmax(0,1fr)}
+  .history-panel{grid-column:1/-1;position:static;max-height:none}
+}
+@media(max-width:900px){
+  .game-layout{grid-template-columns:1fr}
+}
+
+
+.name-label{display:block;margin-top:18px;margin-bottom:7px;font-weight:700}
+.name-input{
+  width:100%;padding:13px 14px;margin-bottom:8px;border-radius:13px;
+  border:1px solid var(--border);background:#101529;color:var(--text);font:inherit
+}
+.name-input:focus{outline:2px solid var(--accent);outline-offset:2px}
+.name-error{color:var(--bad);font-size:13px;margin:0 0 10px}
+.ranking-section{padding-bottom:15px;margin-bottom:15px;border-bottom:1px solid var(--border)}
+.ranking-list{display:grid;gap:7px}
+.ranking-row{
+  display:grid;grid-template-columns:28px 1fr auto;gap:7px;align-items:center;
+  padding:8px;border:1px solid var(--border);border-radius:10px;background:#20263d
+}
+.ranking-row.current{border-color:var(--accent)}
+.rank-number{
+  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  background:#30395c;font-size:12px;font-weight:900
+}
+.ranking-row:nth-child(1) .rank-number{background:#d8ad43;color:#251904}
+.ranking-row:nth-child(2) .rank-number{background:#adb4c0;color:#18202b}
+.ranking-row:nth-child(3) .rank-number{background:#a76e43;color:#211207}
+.rank-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.rank-score{text-align:right}
+.rank-score strong{display:block;font-size:13px}
+.rank-score small{color:var(--muted);font-size:10px}
+.pyramid-tier{cursor:pointer;font:inherit}
+.pyramid-tier:hover{filter:brightness(1.15);transform:scale(1.02)}
+.pyramid-tier:focus{outline:2px solid white;outline-offset:2px}
+.rarity-modal{
+  position:fixed;inset:0;z-index:40;background:rgba(3,5,12,.84);
+  display:grid;place-items:center;padding:18px
+}
+.rarity-modal-card{
+  width:min(900px,100%);max-height:88vh;overflow:auto;
+  background:#171c30;border:1px solid var(--border);border-radius:22px;padding:20px
+}
+.rarity-modal-head{display:flex;justify-content:space-between;gap:15px;align-items:start}
+.rarity-modal-head small{color:var(--muted)}
+.rarity-modal-head h2{margin:3px 0 0}
+.close-modal{
+  border:1px solid var(--border);background:var(--card);color:var(--text);
+  padding:9px 13px;border-radius:11px;cursor:pointer
+}
+.rarity-modal-chance{color:var(--muted);margin-top:5px}
+.rarity-card-list{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:17px}
+.catalog-card{
+  min-height:145px;border:2px solid var(--border);border-radius:15px;
+  padding:13px;position:relative;overflow:hidden;background:#242a42
+}
+.catalog-card strong{display:block;font-size:17px;margin:7px 0}
+.catalog-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.catalog-card .catalog-icon{font-size:25px}
+.catalog-card.r1{border-color:var(--r1);background:#29241f;filter:saturate(.5)}
+.catalog-card.r2{border-color:var(--r2);background:#2a2d31}
+.catalog-card.r3{border-color:var(--r3);background:#1f3025}
+.catalog-card.r4{border-color:var(--r4);background:#1d2a3c}
+.catalog-card.r5{border-color:var(--r5);background:#26213c}
+.catalog-card.r6{border-color:var(--r6);background:#30203b}
+.catalog-card.r7{border-color:var(--r7);background:#3a2a18}
+.catalog-card.r8{border-color:var(--r8);background:#3a351e}
+.catalog-card.r9{border-color:var(--r9);background:#18323a}
+.catalog-card.r10{border-color:var(--r10);background:#3a1832}
+.catalog-card.r8::before,.catalog-card.r9::before,.catalog-card.r10::before{
+  content:"";position:absolute;inset:-60% -20%;
+  background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.3),transparent 65%);
+  animation:shine 2.8s linear infinite;pointer-events:none
+}
+.catalog-card.r9{animation:floatGlow 2.4s ease-in-out infinite}
+.catalog-card.r10{animation:mythicPulse 1.8s ease-in-out infinite}
+@media(max-width:720px){.rarity-card-list{grid-template-columns:1fr}}
+
+
+/* モーダルを閉じたとき、透明なレイヤーが操作を塞がないようにする */
+.rarity-modal.hidden,
+.special-modal.hidden{
+  display:none !important;
+  pointer-events:none !important;
+}
+.rarity-modal:not(.hidden),
+.special-modal:not(.hidden){
+  pointer-events:auto;
+}
+
+
+.operator-prob-section{
+  padding-bottom:15px;
+  margin-bottom:15px;
+  border-bottom:1px solid var(--border);
+}
+.operator-prob-note{
+  color:var(--muted);
+  font-size:11px;
+  margin:4px 0 10px;
+}
+.operator-probability{display:grid;gap:8px}
+.operator-prob-row{
+  display:grid;
+  grid-template-columns:28px 48px minmax(100px,1fr);
+  align-items:center;
+  gap:9px;
+  width:100%;
+}
+.operator-symbol{
+  font-weight:900;
+  text-align:center;
+  font-size:15px;
+}
+.operator-bar{
+  display:block;
+  width:100%;
+  min-width:100px;
+  height:12px;
+  background:#11162a;
+  border-radius:999px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  box-sizing:border-box;
+}
+.operator-bar-fill{
+  display:block;
+  height:100%;
+  min-width:3px;
+  background:linear-gradient(90deg,var(--accent),#78d4ff);
+  border-radius:999px;
+  transition:width .25s ease;
+}
+.operator-percent{
+  font-size:11px;
+  color:var(--muted);
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+.balance-tag{
+  display:inline-block;
+  margin-left:5px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:#29314d;
+  color:var(--muted);
+  font-size:9px;
+}
+
+
+.mode-select{
+  display:grid;
+  gap:10px;
+  margin:18px 0;
+  width:min(520px,100%);
+}
+.mode-select h2{
+  margin:0 0 2px;
+  font-size:15px;
+  color:var(--muted);
+}
+.mode-card{
+  width:100%;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:5px 12px;
+  text-align:left;
+  padding:15px 16px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:#151b31;
+  color:var(--text);
+}
+.mode-card.selected{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 24%,transparent);
+}
+.mode-card.locked{
+  opacity:.55;
+  cursor:not-allowed;
+}
+.mode-title{
+  font-size:18px;
+  font-weight:900;
+}
+.mode-desc{
+  grid-column:1 / -1;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.6;
+}
+.mode-status{
+  justify-self:end;
+  align-self:start;
+  border-radius:999px;
+  padding:3px 8px;
+  font-size:10px;
+  background:var(--accent);
+  color:#07101c;
+  font-weight:900;
+}
+.mode-card.locked .mode-status{
+  background:#303750;
+  color:var(--muted);
+}
+.solo-setup{
+  display:grid;
+  gap:9px;
+  width:min(420px,100%);
+}
+
+
+.name-error{
+  margin:0;
+  color:#ff8f9b;
+  font-size:12px;
+  font-weight:700;
+}
+
+.sound-toggle{
+  margin-top:10px;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#151b31;
+  color:var(--text);
+  font-size:12px;
+  font-weight:800;
+}
+
+
+.current-rank{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  padding:10px 13px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#12182d;
+}
+.current-rank-name{font-weight:900;letter-spacing:.04em}
+.current-rank-progress{color:var(--muted);font-size:11px}
+.current-mode-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-bottom:10px;padding:10px 13px;border:1px solid var(--border);
+  border-radius:10px;background:#101827;
+}
+.current-mode-banner small{color:var(--muted);font-size:10px;letter-spacing:.14em}
+.current-mode-banner strong{font-size:15px;letter-spacing:.08em}
+.current-mode-banner.solo strong{color:#7fd7ff}
+.current-mode-banner.rank strong{color:#ffd86b}
+.current-rank.hidden{display:none!important}
+.rank-guide{
+  width:min(520px,100%);
+  margin-top:16px;
+  padding:13px;
+  border:1px solid var(--border);
+  border-radius:13px;
+  background:#12182d;
+}
+.rank-guide h2{margin:0 0 9px;font-size:14px}
+.rank-guide-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  font-size:11px;
+  color:var(--muted);
+}
+.rank-guide-grid span{
+  padding:7px;
+  border:1px solid var(--border);
+  border-radius:9px;
+}
+.rank-guide-grid b{color:var(--text)}
+.ranking-rank{font-weight:900}
+.rank-beginner{color:#9aa3b8}
+.rank-bronze{color:#cd8a55}
+.rank-silver{color:#d5d9e3}
+.rank-gold{color:#f0c75e}
+.rank-platinum{color:#82e6d7}
+.rank-diamond{color:#76b9ff}
+.rank-master{color:#c48cff}
+.rank-grandmaster{color:#ff7f9c}
+.rank-legend{color:#ffd86b;text-shadow:0 0 9px rgba(255,216,107,.45)}
+@media(max-width:600px){
+  .rank-guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .current-rank{align-items:flex-start;flex-direction:column}
+}
+
+
+.expression.drop-active{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.rank-meter-modal{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(4,7,16,.78)}
+.rank-meter-modal.hidden{display:none}
+.rank-meter-card{width:min(620px,100%);max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:#10162a;padding:18px}
+.rank-meter-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rank-meter-head h2{margin:3px 0 0}.rank-meter-head small{color:var(--muted)}
+.rank-meter-head button{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:#171e35;color:var(--text)}
+.rank-distribution-row{display:grid;grid-template-columns:150px 1fr 48px;gap:10px;align-items:center;margin-top:11px}
+.rank-distribution-track{height:10px;border-radius:999px;overflow:hidden;background:#252c43}
+.rank-distribution-fill{height:100%;border-radius:inherit;background:var(--accent)}
+.rank-rating-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:15px 0}
+.rank-rating-summary>div{padding:10px;border:1px solid var(--border);border-radius:11px;background:#151b31}
+.rank-rating-summary small{display:block;color:var(--muted);margin-bottom:4px}.rank-rating-summary strong{font-size:18px}
+.current-rank{cursor:pointer}.current-rank:hover{border-color:var(--accent)}
+@media(max-width:600px){.rank-distribution-row{grid-template-columns:110px 1fr 40px;font-size:12px}.rank-rating-summary{grid-template-columns:1fr}}
+
+
+.rank-distribution-row.current{
+  padding:9px;
+  border:2px solid var(--accent);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--accent) 12%,#151b31);
+}
+.rank-range{
+  display:block;
+  color:var(--muted);
+  font-size:10px;
+  margin-top:2px;
+}
+.rank-position-wrap{
+  margin:14px 0 18px;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#151b31;
+}
+.rank-position-label{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:7px;
+  font-size:12px;
+}
+.rank-position-track{
+  position:relative;
+  height:14px;
+  border-radius:999px;
+  background:#252c43;
+  overflow:hidden;
+}
+.rank-position-fill{
+  height:100%;
+  background:var(--accent);
+}
+.rank-position-dot{
+  position:absolute;
+  top:50%;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#fff;
+  border:3px solid var(--accent);
+  transform:translate(-50%,-50%);
+}
+
+
+
+
+
+.efficiency-overlay{
+  position:fixed!important;
+  right:22px!important;
+  bottom:22px!important;
+  z-index:2147483647!important;
+  display:block!important;
+  width:min(360px,calc(100vw - 32px));
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(70px);
+  transition:opacity .18s ease,transform .3s cubic-bezier(.16,1,.3,1),visibility 0s linear .3s;
+}
+.efficiency-overlay.show{
+  opacity:1!important;
+  visibility:visible!important;
+  transform:translateY(0)!important;
+  transition-delay:0s;
+}
+.efficiency-panel{
+  position:relative;
+  width:100%;
+  box-sizing:border-box;
+  padding:18px 22px;
+  border:1px solid #ffd54f;
+  border-left-width:5px;
+  border-radius:0;
+  background:linear-gradient(90deg,rgba(17,22,42,.98),rgba(10,13,26,.98));
+  box-shadow:0 16px 38px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);
+  text-align:left;
+  overflow:hidden;
+}
+.efficiency-panel::after{
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  width:42px;
+  height:3px;
+  background:currentColor;
+  opacity:.85;
+}
+.efficiency-title{
+  color:#ffd54f;
+  font-size:30px;
+  line-height:1;
+  font-weight:1000;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  text-shadow:0 0 18px currentColor;
+}
+.efficiency-panel.perfect{border-color:#ffd54f}
+.efficiency-panel.perfect .efficiency-title{color:#ffd54f}
+.efficiency-panel.great{border-color:#64b5f6}
+.efficiency-panel.great .efficiency-title{color:#64b5f6}
+.efficiency-panel.good{border-color:#81c784}
+.efficiency-panel.good .efficiency-title{color:#81c784}
+.efficiency-panel.low{border-color:#ef5350}
+.efficiency-panel.low .efficiency-title{color:#ef5350}
+.efficiency-guide{
+  display:block;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.16);
+  color:#fff;
+  font-size:14px;
+  line-height:1.6;
+  text-align:left;
+  letter-spacing:.03em;
+  word-break:break-word;
+}
+.efficiency-guide strong{
+  color:#ffd54f;
+  font-size:16px;
+}
+.efficiency-guide.hidden{display:none!important}
+
+
+.title-result-notice{margin:14px auto 0;max-width:680px;padding:12px 16px;border:1px solid #5b6b82;background:#111923;color:#eef4ff;font-weight:800;text-align:center;box-shadow:0 10px 28px #0007}
+.title-result-notice.positive{border-color:#53d37f;color:#8dffae}.title-result-notice.negative{border-color:#e45c67;color:#ff9ca4}.title-result-notice.neutral{border-color:#8b96a8;color:#d8deea}
+
+/* ===== UI POLISH v1 ===== */
+:root{
+  --bg:#080b13;
+  --panel:#111723;
+  --card:#171f2e;
+  --text:#f3f6fb;
+  --muted:#8d99ac;
+  --border:#293449;
+  --accent:#7d8cff;
+  --ok:#4ed69a;
+  --bad:#ff6678;
+  --warn:#f2bd55;
+}
+body{
+  background:
+    radial-gradient(circle at 50% -20%,rgba(125,140,255,.16),transparent 38%),
+    linear-gradient(180deg,#080b13 0%,#0c111b 52%,#090d15 100%);
+  background-attachment:fixed;
+}
+main{width:min(1440px,calc(100% - 32px));margin:20px auto 52px}
+h1{letter-spacing:-.035em;font-weight:900}
+h2{font-size:17px;letter-spacing:.01em}
+
+.start-screen{min-height:calc(100vh - 72px)}
+.start-card{
+  width:min(760px,100%);
+  padding:34px;
+  border-radius:16px;
+  border:1px solid #34415a;
+  background:linear-gradient(155deg,rgba(255,255,255,.035),transparent 40%),#101622;
+  box-shadow:0 28px 80px rgba(0,0,0,.38);
+}
+.start-card>h1{font-size:clamp(34px,6vw,54px);margin-bottom:8px}
+.start-card>p{font-size:15px;margin-top:0}
+.start-card ul{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 24px;
+  margin:18px 0 26px;padding-left:20px;font-size:13px
+}
+.mode-select{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.mode-select h2{grid-column:1/-1;margin:0 0 2px}
+.mode-card{
+  position:relative;min-height:124px;text-align:left;padding:18px 15px 42px;
+  border-radius:12px!important;background:#151c29!important;border:1px solid #303b50!important;
+  transition:transform .15s ease,border-color .15s ease,background .15s ease
+}
+.mode-card:hover:not(:disabled){transform:translateY(-2px);border-color:#5e6e90!important}
+.mode-card.selected{border-color:var(--accent)!important;background:#192139!important;box-shadow:inset 0 0 0 1px rgba(125,140,255,.28)}
+.mode-title{font-size:17px!important}
+.mode-desc{font-size:12px!important;line-height:1.55!important;margin-top:7px!important}
+.mode-status{position:absolute!important;left:14px!important;bottom:12px!important;top:auto!important;right:auto!important;border-radius:4px!important}
+.solo-setup{margin-top:20px}
+#playerName{border-radius:9px!important;background:#0c111b!important;color:#f4f7ff!important;caret-color:#f4f7ff!important}
+#playerName::placeholder{color:#7f8ba3!important;opacity:1}
+#playerName:-webkit-autofill{-webkit-text-fill-color:#f4f7ff!important;box-shadow:0 0 0 1000px #0c111b inset!important}
+#startButton{
+  min-height:54px;border-radius:9px!important;border:1px solid #9aa5ff!important;
+  background:linear-gradient(180deg,#8592ff,#6676e9)!important;
+  box-shadow:0 10px 28px rgba(89,105,223,.26);font-size:17px!important
+}
+#startButton:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.rank-guide{border-radius:11px!important;background:#0d131e!important;border-color:#263247!important}
+.rank-guide-grid span{border-radius:6px!important;background:#151d2b!important}
+.sound-toggle{border-radius:8px!important}
+
+#gameScreen>h1{display:none}
+.game-layout{grid-template-columns:210px minmax(0,1fr) 270px;gap:12px}
+.rarity-guide,.history-panel,.panel,.stat{
+  border-radius:11px;
+  background:linear-gradient(150deg,rgba(255,255,255,.02),transparent 36%),var(--panel);
+  border-color:var(--border)
+}
+.rarity-guide,.history-panel{box-shadow:0 12px 36px rgba(0,0,0,.16)}
+.rarity-guide{padding:14px}
+.rarity-guide>p{font-size:11px;line-height:1.55}
+.rarity-pyramid{gap:4px;margin:12px 0}
+.pyramid-tier{height:29px;border-radius:4px;transition:filter .12s ease,transform .12s ease}
+.rarity-legend{gap:5px}
+.rarity-row{font-size:11px}
+
+.current-rank{margin-bottom:10px!important;border-radius:10px!important}
+.stats{gap:8px;margin-bottom:10px}
+.stat{padding:12px 9px;min-height:82px;display:flex;flex-direction:column;justify-content:center}
+.stat small{text-transform:uppercase;letter-spacing:.08em;font-size:10px}
+.stat strong{font-size:24px;margin-top:2px}
+.bar{height:6px;margin-top:7px;background:#202a3b}
+.panel{padding:15px;margin-bottom:10px}
+.panel h2{margin-bottom:12px;color:#dce3ef}
+
+.cards{gap:9px}
+.cardbtn{
+  min-height:146px;border-radius:10px;border-width:1px;
+  background:linear-gradient(145deg,rgba(255,255,255,.06),transparent 45%),#182131;
+  box-shadow:0 9px 20px rgba(0,0,0,.2);
+  transition:transform .13s ease,border-color .13s ease,box-shadow .13s ease,opacity .13s ease
+}
+.cardbtn::before{inset:7px;border-radius:6px;border-color:rgba(255,255,255,.1)}
+.cardbtn:hover:not(:disabled){transform:translateY(-4px);box-shadow:0 15px 27px rgba(0,0,0,.28);border-color:#7d8cff}
+.cardtype,.cardfoot{font-size:9px;letter-spacing:.12em}
+.expression{min-height:72px;border-radius:8px;background:#0d131e;border-style:dashed}
+.token{border-radius:6px;background:#263249;border:1px solid #3a4861}
+.actions{gap:8px}
+button.action{border-radius:7px;padding:12px 10px;background:#182131;transition:filter .12s ease,transform .12s ease,border-color .12s ease}
+button.action:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.12);border-color:#53627d}
+button.primary{background:#6676e9;border-color:#8491ff}
+button.warn{background:#4a3918;border-color:#886e31}
+.message{border-radius:8px;background:#151e2d;margin-bottom:10px}
+
+.specials{gap:8px}
+.special-card{min-height:112px;border-radius:8px;padding:12px;border-width:1px}
+.special-card strong{font-size:15px}.special-card small{font-size:11px}
+.history-panel{padding:14px}
+.history-panel section+section{margin-top:16px}
+.history-item,.ranking-row{border-radius:6px;background:#151d2b}
+.history-item{padding:9px}
+.operator-probability{gap:6px!important}
+
+.special-modal{backdrop-filter:blur(8px);background:rgba(2,4,9,.8)}
+.special-modal-card{border-radius:12px;padding:26px;background:#111827;box-shadow:0 32px 100px rgba(0,0,0,.52)}
+.special-reward{border-radius:8px;background:#171f30}
+.special-modal-card button{border-radius:7px}
+.rarity-modal-card{border-radius:12px!important}
+
+.efficiency-panel{border-radius:0!important;box-shadow:0 18px 48px rgba(0,0,0,.45)!important}
+
+/* Game-over rating result */
+.efficiency-panel.gameover-rate{border-color:#ff6b86;min-width:min(360px,calc(100vw - 32px));}
+.efficiency-panel.gameover-rate .efficiency-title{color:#ff8ca1;font-size:22px;letter-spacing:.12em;}
+.gameover-rate-change{font-size:34px;font-weight:950;line-height:1.1;margin:8px 0 6px;}
+.gameover-rate-change.positive{color:#7cff8a;}
+.gameover-rate-change.negative{color:#ff8a8a;}
+.gameover-rate-change.neutral{color:#d8deea;}
+.gameover-rate-current{font-size:15px;color:#d8deea;margin-top:6px;}
+.gameover-rate-current strong{font-size:20px;color:#fff;}
+
+.title-result-notice{border-radius:0!important}
+
+@media(max-width:980px){
+  .game-layout{grid-template-columns:1fr}
+  .rarity-guide,.history-panel{position:static;max-height:none}
+  .rarity-guide{display:none}
+}
+@media(max-width:720px){
+  main{width:min(100% - 18px,1440px);margin-top:9px}
+  .start-card{padding:22px 16px;border-radius:12px}
+  .start-card ul{grid-template-columns:1fr}
+  .mode-select{grid-template-columns:1fr}
+  .mode-select h2{grid-column:auto}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stats .stat:last-child{grid-column:1/-1}
+  .cards{grid-template-columns:repeat(3,1fr)}
+  .cardbtn{min-height:118px;font-size:31px}
+}
+@media(max-width:460px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .start-card>h1{font-size:32px}
+}
+
+
+.perfect-bonus-status{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  width:max-content;max-width:100%;margin:0 0 12px;padding:8px 11px;
+  border:1px solid #4b5368;background:#121826;color:#dce4f7;
+  font-size:12px;letter-spacing:.02em
+}
+.perfect-bonus-label{font-weight:900;color:#ffe08a}
+.perfect-bonus-detail{color:#b8c3d9}
+.perfect-bonus-status strong{font-size:17px;color:#fff;line-height:1}
+@media(max-width:600px){
+  .perfect-bonus-status{width:100%;justify-content:space-between}
+}
+
+/* PERFECT BONUS reward presentation */
+.reward-bonus-banner{
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  margin:0 0 14px;padding:9px 12px;border:1px solid #ffd66b;
+  background:linear-gradient(90deg,rgba(255,214,107,.08),rgba(255,214,107,.2),rgba(255,214,107,.08));
+  color:#fff2b8;letter-spacing:.08em;text-align:center
+}
+.reward-bonus-banner span{font-size:12px;font-weight:950;color:#ffd66b}
+.reward-bonus-banner strong{font-size:16px;color:#fff}
+.special-modal.perfect-bonus-modal .special-modal-card{
+  border:2px solid #ffd66b;
+  box-shadow:0 0 0 1px rgba(255,214,107,.18),0 32px 100px rgba(0,0,0,.58)
+}
+.special-modal.perfect-bonus-modal .special-modal-card>h2{color:#ffe69a;letter-spacing:.06em}
+.special-reward.perfect-bonus-reward{
+  position:relative;border-width:2px!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 0 24px rgba(255,214,107,.2);
+  animation:perfectBonusReveal .5s ease-out
+}
+.special-reward.perfect-bonus-reward::before{
+  content:"BONUS CARD";position:absolute;top:8px;right:9px;
+  padding:3px 6px;border:1px solid rgba(255,214,107,.7);
+  background:#2b2412;color:#ffe08a;font-size:9px;font-weight:950;letter-spacing:.12em
+}
+@keyframes perfectBonusReveal{
+  0%{transform:scale(.94);opacity:.35}
+  65%{transform:scale(1.025);opacity:1}
+  100%{transform:scale(1)}
+}
+
+</style>
+</head>
+<body>
+<main>
+  <section id="startScreen" class="start-screen">
+    <div class="start-card">
+      <h1>5枚カード式バトル</h1>
+      <p>数字カード3枚と記号カード2枚を、すべて使って1つの式を作るゲームです。</p>
+      <ul>
+        <li>カードはクリック、またはドラッグで並べ替えられます。</li>
+        <li>目標に届かなかった分だけ体力が減ります。</li>
+        <li>時間切れ後は、毎秒体力が減ります。</li>
+        <li>引き直しは各ラウンド3回までです。</li>
+        <li>制限時間は全ラウンド一律30秒です。</li><li>2ラウンド終了するごとに特殊カードを1枚獲得します。</li>
+      </ul>
+      
+<div class="mode-select">
+  <h2>ゲームモード</h2>
+  <button id="soloModeButton" class="mode-card selected" type="button">
+    <span class="mode-title">Solo Play</span>
+    <span class="mode-desc">ランク変動なしで、自由に最高記録へ挑戦する</span>
+    <span class="mode-status">通常</span>
+  </button>
+  <button id="rankModeButton" class="mode-card" type="button">
+    <span class="mode-title">Solo Rank Play</span>
+    <span class="mode-desc">現在ランクの平均記録を基準に、ランクポイントが上下する</span>
+    <span class="mode-status">RP戦</span>
+  </button>
+  <button class="mode-card locked" type="button" disabled>
+    <span class="mode-title">Online Battle</span>
+    <span class="mode-desc">ほかのプレイヤーとの対戦モード</span>
+    <span class="mode-status">今後追加予定</span>
+  </button>
+</div>
+
+<div id="soloSetup" class="solo-setup">
+  <label for="playerName">プレイヤー名</label>
+  <input id="playerName" maxlength="16" autocomplete="nickname" placeholder="名前を入力">
+  <p id="nameError" class="hidden name-error">プレイヤー名を入力してください。</p>
+  <button id="startButton" type="button"><span id="startButtonText">Solo Playを開始</span></button>
+
+<section class="rank-guide">
+  <h2>Solo Rank</h2>
+  <div class="rank-guide-grid">
+    <span><b>ビギナー</b> 0–2R</span>
+    <span><b>ブロンズ</b> 3–4R</span>
+    <span><b>シルバー</b> 5–6R</span>
+    <span><b>ゴールド</b> 7–8R</span>
+    <span><b>プラチナ</b> 9–11R</span>
+    <span><b>ダイヤモンド</b> 12–15R</span>
+    <span><b>マスター</b> 16–20R</span>
+    <span><b>グランドマスター</b> 21–29R</span>
+    <span><b>レジェンド</b> 30R以上</span>
+  </div>
+</section>
+
+<button id="soundToggle" class="sound-toggle" type="button" aria-pressed="true">🔊 効果音 ON</button>
+</div>
+
+    </div>
+  </section>
+
+  <section id="gameScreen" class="hidden">
+    <h1>5枚カード式バトル</h1>
+    <div class="game-layout">
+      <aside class="rarity-guide">
+        <h2>特殊カードのレアリティ</h2>
+        <p>カード効果を回復・防御・目標軽減・再抽選・演算子補正の総合力で再評価。上ほど強いですが、単体で勝敗が決まる効果は抑えています。</p>
+        
+<div class="rarity-pyramid" aria-label="レアリティのピラミッド">
+  <button type="button" class="pyramid-tier r10" data-rarity="r10">MYTHIC 1%</button>
+  <button type="button" class="pyramid-tier r9" data-rarity="r9">CELESTIAL 2%</button>
+  <button type="button" class="pyramid-tier r8" data-rarity="r8">DIVINE 3%</button>
+  <button type="button" class="pyramid-tier r7" data-rarity="r7">LEGENDARY 5%</button>
+  <button type="button" class="pyramid-tier r6" data-rarity="r6">EPIC 7%</button>
+  <button type="button" class="pyramid-tier r5" data-rarity="r5">HEROIC 10%</button>
+  <button type="button" class="pyramid-tier r4" data-rarity="r4">RARE 12%</button>
+  <button type="button" class="pyramid-tier r3" data-rarity="r3">UNCOMMON 15%</button>
+  <button type="button" class="pyramid-tier r2" data-rarity="r2">COMMON 20%</button>
+  <button type="button" class="pyramid-tier r1" data-rarity="r1">JUNK 25%</button>
+</div>
+<div class="rarity-legend">
+  <div class="rarity-row"><span class="rarity-dot r10"></span><span>MYTHIC</span><small>神話級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r9"></span><span>CELESTIAL</span><small>天界級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r8"></span><span>DIVINE</span><small>神聖級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r7"></span><span>LEGENDARY</span><small>伝説級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r6"></span><span>EPIC</span><small>叙事級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r5"></span><span>HEROIC</span><small>英雄級</small></div>
+  <div class="rarity-row"><span class="rarity-dot r4"></span><span>RARE</span><small>希少</small></div>
+  <div class="rarity-row"><span class="rarity-dot r3"></span><span>UNCOMMON</span><small>少し珍しい</small></div>
+  <div class="rarity-row"><span class="rarity-dot r2"></span><span>COMMON</span><small>普通</small></div>
+  <div class="rarity-row"><span class="rarity-dot r1"></span><span>JUNK</span><small>ボロい</small></div>
+</div>
+</aside>
+      <div class="game-main">
+
+    <div id="currentModeBanner" class="current-mode-banner solo" aria-live="polite">
+      <small>NOW PLAYING</small>
+      <strong id="currentModeName">SOLO PLAY</strong>
+    </div>
+    <div id="currentRank" class="current-rank hidden"></div>
+    <div class="perfect-bonus-status" aria-label="PERFECT時の追加特殊カード獲得率">
+      <span class="perfect-bonus-label">PERFECT BONUS</span>
+      <span class="perfect-bonus-detail">毎ターン追加抽選</span>
+      <strong id="perfectBonusRate">10%</strong>
+    </div>
+<section class="stats">
+      <div class="stat"><small>ラウンド</small><strong id="round">1</strong></div>
+      <div class="stat"><small>目標</small><strong id="target">10</strong></div>
+      <div class="stat"><small>体力</small><strong id="hp">100</strong><div class="bar"><div id="hpBar" class="hpfill"></div></div></div>
+      <div class="stat"><small>残り時間</small><strong id="time">20</strong><div class="bar"><div id="timeBar" class="timefill"></div></div></div>
+      <div class="stat"><small>引き直し</small><strong id="rerolls">3 / 3</strong></div>
+    </section>
+
+    <div id="gameover" class="gameover">
+      <h2>ゲームオーバー</h2>
+      <p id="gameoverText"></p>
+    </div>
+
+    <section class="panel">
+      <h2>配られた5枚</h2>
+      <div id="cards" class="cards"></div>
+      <p class="help">クリックして式に追加できます。カードをドラッグすると、手札の並び順も変更できます。</p>
+    </section>
+
+    <section class="panel">
+      <h2>作った式</h2>
+      <div id="expression" class="expression">カードを順番に選択</div>
+      <div class="actions">
+        <button id="undo" class="action">1つ戻す</button>
+        <button id="calculate" class="action primary" disabled>この式で戦う</button>
+        <button id="reroll" class="action warn">カードを引き直す</button>
+      </div>
+      <p class="help">作った式のカードもドラッグで順番を変更できます。数字と記号が交互になるように並べてください。</p>
+    </section>
+
+    <section class="panel">
+      <h2>所持している特殊カード</h2>
+      <div id="specials" class="specials"></div>
+      <p id="specialEmpty" class="help">まだ特殊カードを持っていません。</p>
+    </section>
+
+    <div id="message" class="message" aria-live="polite"></div>
+
+    <div class="actions">
+      <button id="nextRound" class="action primary" disabled>次のラウンド</button>
+      <button id="restart" class="action">最初から</button>
+      <button id="backTitle" class="action">タイトルへ</button>
+    </div>
+      </div>
+      <aside class="history-panel">
+        <section class="operator-prob-section">
+          <h2>演算子の出現率</h2>
+          <p class="operator-prob-note">特殊カードの効果を反映した現在値</p>
+          <div id="operatorProbability" class="operator-probability"></div>
+        </section>
+        <section class="ranking-section">
+          <h2>ランキング</h2>
+          <div id="rankingList" class="ranking-list">
+            <p class="history-empty">まだ記録はありません。</p>
+          </div>
+        </section>
+        <section class="history-section">
+          <h2>バトル履歴</h2>
+          <div id="historyList" class="history-list">
+          <p class="history-empty">まだ履歴はありません。</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </section>
+</main>
+
+
+<div id="rankMeterModal" class="rank-meter-modal hidden">
+  <div class="rank-meter-card">
+    <div class="rank-meter-head">
+      <div><small>SOLO RANK DISTRIBUTION</small><h2>ランク分布</h2></div>
+      <button id="closeRankMeter" type="button">×</button>
+    </div>
+    <div id="rankMeterContent"></div>
+  </div>
+</div>
+
+<div id="specialModal" class="special-modal hidden">
+  <div class="special-modal-card">
+    <h2 id="rewardHeading">特殊カード獲得！</h2>
+    <div id="rewardBonusBanner" class="reward-bonus-banner hidden">
+      <span>PERFECT BONUS</span>
+      <strong>追加特殊カード</strong>
+    </div>
+    <div class="special-reward">
+      <div id="rewardIcon" class="icon">★</div>
+      <strong id="rewardName"></strong>
+      <div id="rewardRarity" class="reward-rarity"></div>
+      <p id="rewardDescription"></p>
+    </div>
+    <button id="acceptReward">受け取る</button>
+  </div>
+</div>
+
+<div id="rarityModal" class="rarity-modal hidden">
+  <div class="rarity-modal-card">
+    <div class="rarity-modal-head">
+      <div>
+        <small>特殊カード図鑑</small>
+        <h2 id="rarityModalTitle">レアリティ</h2>
+      </div>
+      <button id="closeRarityModal" class="close-modal" type="button">閉じる</button>
+    </div>
+    <p id="rarityModalChance" class="rarity-modal-chance"></p>
+    <div id="rarityCardList" class="rarity-card-list"></div>
+  </div>
+</div>
+
+<script>
+const operatorPool=[
+  {v:"+",label:"＋",name:"ADD",weight:1},
+  {v:"-",label:"−",name:"SUB",weight:1},
+  {v:"*",label:"×",name:"MUL",weight:1},
+  {v:"/",label:"÷",name:"DIV",weight:1},
+  {v:"%",label:"%",name:"MOD",weight:1},
+  {v:"^",label:"^",name:"POW",weight:1}
+];
+
+const specialPool=[{"id":"sp_1","icon":"紙","name":"欠けた護符","rarity":"r1","rarityLabel":"JUNK","weight":25,"description":"毎ラウンドHPを1回復","effect":"roundHeal","value":1},{"id":"sp_2","icon":"↻","name":"古い引換券","rarity":"r1","rarityLabel":"JUNK","weight":25,"description":"引き直し回数+1","effect":"extraRerolls","value":1},{"id":"sp_3","icon":"尺","name":"鈍い計算尺","rarity":"r1","rarityLabel":"JUNK","weight":25,"description":"不足ダメージを2%軽減","effect":"damageReduce","value":0.02},{"id":"sp_4","icon":"本","name":"薄い参考書","rarity":"r1","rarityLabel":"JUNK","weight":25,"description":"目標値を1%下げる","effect":"targetReduce","value":0.01},{"id":"sp_5","icon":"＋","name":"曲がった足し札","rarity":"r1","rarityLabel":"JUNK","weight":25,"description":"+の出現率がわずかに上がる","effect":"plusWeight","value":0.4},{"id":"sp_6","icon":"♥","name":"小回復薬","rarity":"r2","rarityLabel":"COMMON","weight":20,"description":"毎ラウンドHPを2回復","effect":"roundHeal","value":2},{"id":"sp_7","icon":"砂","name":"小さな砂時計","rarity":"r2","rarityLabel":"COMMON","weight":20,"description":"制限時間+2秒","effect":"extraTime","value":2},{"id":"sp_8","icon":"盾","name":"革の盾","rarity":"r2","rarityLabel":"COMMON","weight":20,"description":"不足ダメージを4%軽減","effect":"damageReduce","value":0.04},{"id":"sp_9","icon":"包","name":"応急包帯","rarity":"r2","rarityLabel":"COMMON","weight":20,"description":"HPが30以下でラウンド開始時HPを2回復","effect":"lowHpHeal","value":2},{"id":"sp_10","icon":"×","name":"掛け札","rarity":"r2","rarityLabel":"COMMON","weight":20,"description":"×の出現率が少し上がる","effect":"mulWeight","value":0.8},{"id":"sp_11","icon":"葉","name":"緑の薬草","rarity":"r3","rarityLabel":"UNCOMMON","weight":15,"description":"毎ラウンドHPを3回復","effect":"roundHeal","value":3},{"id":"sp_12","icon":"閃","name":"ひらめき札","rarity":"r3","rarityLabel":"UNCOMMON","weight":15,"description":"PERFECT時にHPを3回復","effect":"perfectHeal","value":3},{"id":"sp_13","icon":"盾","name":"青銅の盾","rarity":"r3","rarityLabel":"UNCOMMON","weight":15,"description":"不足ダメージを6%軽減","effect":"damageReduce","value":0.06},{"id":"sp_14","icon":"壁","name":"木の防壁","rarity":"r3","rarityLabel":"UNCOMMON","weight":15,"description":"各ラウンド最初の不足ダメージを2軽減","effect":"flatGuard","value":2},{"id":"sp_15","icon":"×","name":"掛け算の印","rarity":"r3","rarityLabel":"UNCOMMON","weight":15,"description":"×の出現率が上がる","effect":"mulWeight","value":1.3},{"id":"sp_16","icon":"◆","name":"青の宝珠","rarity":"r4","rarityLabel":"RARE","weight":12,"description":"最大HP+10、HPも10回復","effect":"maxHpHeal","value":10},{"id":"sp_17","icon":"^","name":"累乗の手引き","rarity":"r4","rarityLabel":"RARE","weight":12,"description":"^の出現率が少し上がる","effect":"powerWeight","value":0.8},{"id":"sp_18","icon":"時","name":"静止の護符","rarity":"r4","rarityLabel":"RARE","weight":12,"description":"時間切れダメージの間隔を2秒にする","effect":"slowTimeout","value":1},{"id":"sp_19","icon":"星","name":"精密計算機","rarity":"r4","rarityLabel":"RARE","weight":12,"description":"GREAT以上でHPを2回復","effect":"greatHeal","value":2},{"id":"sp_20","icon":"眼","name":"戦術メモ","rarity":"r4","rarityLabel":"RARE","weight":12,"description":"毎ラウンド最初の引き直しは回数を消費しない","effect":"freeFirstReroll","value":1},{"id":"sp_21","icon":"♥","name":"英雄の薬瓶","rarity":"r5","rarityLabel":"HEROIC","weight":9,"description":"毎ラウンドHPを4回復","effect":"roundHeal","value":4},{"id":"sp_22","icon":"冠","name":"選別の王冠","rarity":"r5","rarityLabel":"HEROIC","weight":9,"description":"^の出現率が上がる","effect":"powerWeight","value":1.5},{"id":"sp_23","icon":"時","name":"集中の時計","rarity":"r5","rarityLabel":"HEROIC","weight":9,"description":"制限時間+5秒","effect":"extraTime","value":5},{"id":"sp_24","icon":"盾","name":"銀の防壁","rarity":"r5","rarityLabel":"HEROIC","weight":9,"description":"各ラウンド最初の不足ダメージを5軽減","effect":"flatGuard","value":5},{"id":"sp_25","icon":"本","name":"賢者の助言","rarity":"r5","rarityLabel":"HEROIC","weight":9,"description":"目標値を5%下げる","effect":"targetReduce","value":0.05},{"id":"sp_26","icon":"⚡","name":"紫電の魔導書","rarity":"r6","rarityLabel":"EPIC","weight":7,"description":"^の出現率が大きく上がる","effect":"powerWeight","value":2.4},{"id":"sp_27","icon":"枝","name":"生命樹の枝","rarity":"r6","rarityLabel":"EPIC","weight":7,"description":"最大HP+16、毎ラウンドHPを3回復","effect":"maxHpRoundHeal","value":[16,3]},{"id":"sp_28","icon":"◇","name":"再考の宝石","rarity":"r6","rarityLabel":"EPIC","weight":7,"description":"ラウンド開始時30%で引き直し回数+2","effect":"rerollChance","value":[0.3,2]},{"id":"sp_29","icon":"盾","name":"黒曜の鎧","rarity":"r6","rarityLabel":"EPIC","weight":7,"description":"不足ダメージを16%軽減","effect":"damageReduce","value":0.16},{"id":"sp_30","icon":"機","name":"演算調律器","rarity":"r6","rarityLabel":"EPIC","weight":7,"description":"×と^の出現率が上がる","effect":"powerMul","value":1.2},{"id":"sp_31","icon":"★","name":"黄金式","rarity":"r7","rarityLabel":"LEGENDARY","weight":5,"description":"PERFECT時にHPを8回復","effect":"perfectHeal","value":8},{"id":"sp_32","icon":"本","name":"賢王の書","rarity":"r7","rarityLabel":"LEGENDARY","weight":5,"description":"目標値を6%下げる","effect":"targetReduce","value":0.06},{"id":"sp_33","icon":"羽","name":"不死鳥の羽","rarity":"r7","rarityLabel":"LEGENDARY","weight":5,"description":"一度だけHP1で耐える","effect":"revive","value":1},{"id":"sp_34","icon":"鏡","name":"王家の鏡","rarity":"r7","rarityLabel":"LEGENDARY","weight":5,"description":"各ラウンド1回、引き直し回数を消費しない","effect":"freeFirstReroll","value":1},{"id":"sp_35","icon":"輪","name":"演算王の指輪","rarity":"r7","rarityLabel":"LEGENDARY","weight":5,"description":"×と^の出現率が大きく上がる","effect":"powerMul","value":2.0},{"id":"sp_36","icon":"杯","name":"神聖の聖杯","rarity":"r8","rarityLabel":"DIVINE","weight":3,"description":"最大HP+24、毎ラウンドHPを5回復","effect":"maxHpRoundHeal","value":[24,5]},{"id":"sp_37","icon":"札","name":"運命改変札","rarity":"r8","rarityLabel":"DIVINE","weight":3,"description":"目標値を8%下げる","effect":"targetReduce","value":0.08},{"id":"sp_38","icon":"壁","name":"絶対防壁","rarity":"r8","rarityLabel":"DIVINE","weight":3,"description":"不足ダメージを21%軽減","effect":"damageReduce","value":0.21},{"id":"sp_39","icon":"双","name":"神授の選択","rarity":"r8","rarityLabel":"DIVINE","weight":3,"description":"ラウンド開始時50%で引き直し回数+3","effect":"rerollChance","value":[0.5,3]},{"id":"sp_40","icon":"脳","name":"天才の直感","rarity":"r8","rarityLabel":"DIVINE","weight":3,"description":"^の出現率がかなり上がる","effect":"powerWeight","value":3.2},{"id":"sp_41","icon":"星","name":"星界の心臓","rarity":"r9","rarityLabel":"CELESTIAL","weight":2,"description":"最大HP+34、毎ラウンドHPを6回復","effect":"maxHpRoundHeal","value":[34,6]},{"id":"sp_42","icon":"時","name":"時の支配者","rarity":"r9","rarityLabel":"CELESTIAL","weight":2,"description":"時間切れダメージの間隔を3秒にする","effect":"timeout3","value":1},{"id":"sp_43","icon":"翼","name":"数式の翼","rarity":"r9","rarityLabel":"CELESTIAL","weight":2,"description":"目標値を9%下げ、毎ラウンドHPを3回復","effect":"targetHeal","value":[0.09,3]},{"id":"sp_44","icon":"光","name":"奇跡の余白","rarity":"r9","rarityLabel":"CELESTIAL","weight":2,"description":"制限時間+10秒、時間切れダメージ間隔+1秒","effect":"timeAndTimeout","value":[10,1]},{"id":"sp_45","icon":"天","name":"天上演算","rarity":"r9","rarityLabel":"CELESTIAL","weight":2,"description":"×と^の出現率が非常に大きく上がる","effect":"powerMul","value":3.0},{"id":"sp_46","icon":"∞","name":"無限演算核","rarity":"r10","rarityLabel":"MYTHIC","weight":1,"description":"^の出現率を大幅に上げ、目標値を7%下げる","effect":"powerTarget","value":[4,0.07]},{"id":"sp_47","icon":"神","name":"神命の器","rarity":"r10","rarityLabel":"MYTHIC","weight":1,"description":"最大HP+45、毎ラウンドHPを8回復","effect":"maxHpRoundHeal","value":[45,8]},{"id":"sp_48","icon":"盾","name":"完全防御","rarity":"r10","rarityLabel":"MYTHIC","weight":1,"description":"各ラウンド最初の不足ダメージを15軽減","effect":"flatGuard","value":15},{"id":"sp_49","icon":"界","name":"世界再編","rarity":"r10","rarityLabel":"MYTHIC","weight":1,"description":"引き直し回数+8、目標値を7%下げる","effect":"rerollTarget","value":[8,0.07]},{"id":"sp_50","icon":"光","name":"永劫の知恵","rarity":"r10","rarityLabel":"MYTHIC","weight":1,"description":"毎ラウンドHPを7回復し、^の出現率を大きく上げる","effect":"healPower","value":[7,2.5]}];
+
+
+let audioContext=null;
+let soundEnabled=true;
+
+function getAudioContext(){
+  if(!audioContext){
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)return null;
+    audioContext=new AudioCtx();
+  }
+  if(audioContext.state==="suspended")audioContext.resume();
+  return audioContext;
+}
+
+function tone(freq,duration=.09,type="sine",volume=.04,delay=0){
+  if(!soundEnabled)return;
+  const ctx=getAudioContext();
+  if(!ctx)return;
+  const start=ctx.currentTime+delay;
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  osc.type=type;
+  osc.frequency.setValueAtTime(freq,start);
+  gain.gain.setValueAtTime(.0001,start);
+  gain.gain.exponentialRampToValueAtTime(volume,start+.01);
+  gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start+duration+.03);
+}
+
+function playSound(name,value=0){
+  switch(name){
+    case "start": tone(330,.08,"triangle",.04);tone(440,.10,"triangle",.04,.07);tone(660,.14,"triangle",.045,.15);break;
+    case "select": tone(520,.055,"sine",.025);break;
+    case "undo": tone(420,.06,"triangle",.025);tone(310,.07,"triangle",.022,.045);break;
+    case "reroll": tone(280,.07,"square",.022);tone(420,.07,"square",.022,.055);tone(560,.08,"square",.022,.11);break;
+    case "success": tone(523,.09,"triangle",.045);tone(659,.09,"triangle",.045,.08);tone(784,.15,"triangle",.05,.16);break;
+    case "damage":{
+      const power=Math.min(1,Math.max(.3,value/45));
+      tone(145,.16,"sawtooth",.08*power);
+      tone(92,.22,"square",.06*power,.045);
+      tone(62,.30,"sawtooth",.05*power,.10);
+      break;
+    }
+    case "gameover": tone(260,.12,"triangle",.04);tone(210,.14,"triangle",.04,.11);tone(150,.22,"triangle",.05,.24);break;
+    case "next": tone(410,.07,"sine",.03);tone(540,.09,"sine",.035,.06);break;
+    case "tick": tone(760,.035,"square",.014);break;
+  }
+}
+function playRaritySound(level){
+  const n=Math.max(1,Math.min(10,level));
+  const base=300+n*34;
+  const notes=n<=2?1:n<=4?2:n<=6?3:n<=8?4:n===9?5:7;
+  for(let i=0;i<notes;i++)tone(base*Math.pow(2,i/7),.07+i*.012,n>=7?"triangle":"sine",.025+n*.003,i*.055);
+  if(n>=7)tone(base/2,.22,"sine",.035,.02);
+  if(n>=9){tone(base*2,.18,"triangle",.05,.28);tone(base*2.5,.22,"sine",.04,.36);}
+  if(n===10){tone(base*.75,.35,"sawtooth",.025,.05);tone(base*3,.28,"triangle",.055,.48);}
+}
+function raritySound(card){
+  const order=["JUNK","COMMON","UNCOMMON","RARE","HEROIC","EPIC","LEGENDARY","DIVINE","CELESTIAL","MYTHIC"];
+  playRaritySound(Math.max(1,order.indexOf(card?.rarity)+1));
+}
+
+let selectedGameMode="solo";
+
+
+const soloRanks=[
+  {min:0,name:"BEGINNER",label:"ビギナー",mark:"Ⅰ"},
+  {min:3,name:"BRONZE",label:"ブロンズ",mark:"Ⅱ"},
+  {min:5,name:"SILVER",label:"シルバー",mark:"Ⅲ"},
+  {min:7,name:"GOLD",label:"ゴールド",mark:"Ⅳ"},
+  {min:9,name:"PLATINUM",label:"プラチナ",mark:"Ⅴ"},
+  {min:12,name:"DIAMOND",label:"ダイヤモンド",mark:"Ⅵ"},
+  {min:16,name:"MASTER",label:"マスター",mark:"Ⅶ"},
+  {min:21,name:"GRANDMASTER",label:"グランドマスター",mark:"Ⅷ"},
+  {min:30,name:"LEGEND",label:"レジェンド",mark:"★"}
+];
+
+function getSoloRank(round){
+  let result=soloRanks[0];
+  for(const rank of soloRanks){
+    if(round>=rank.min)result=rank;
+    else break;
+  }
+  return result;
+}
+
+function nextSoloRank(round){
+  return soloRanks.find(rank=>rank.min>round)||null;
+}
+
+function renderCurrentMode(){
+  const banner=$("currentModeBanner");
+  const name=$("currentModeName");
+  if(!banner||!name)return;
+  const ranked=selectedGameMode==="rank";
+  banner.classList.toggle("rank",ranked);
+  banner.classList.toggle("solo",!ranked);
+  name.textContent=ranked?"SOLO RANK PLAY":"SOLO PLAY";
+}
+
+function renderCurrentRank(){
+  const box=$("currentRank");
+  if(!box)return;
+  const ranked=selectedGameMode==="rank";
+  box.classList.toggle("hidden",!ranked);
+  if(!ranked){
+    box.innerHTML="";
+    return;
+  }
+  const band=getRatingBand();
+  box.innerHTML=`<span class="current-rank-name rank-${band.name.toLowerCase()}">${band.label} ${state.rankRating} RP</span>
+    <span class="current-rank-progress">基準平均 ${band.avg}R　クリックで分布</span>`;
+}
+
+
+
+const rankRatingBands=[
+  {min:0,max:599,name:"BEGINNER",label:"ビギナー",avg:2},
+  {min:600,max:799,name:"BRONZE",label:"ブロンズ",avg:4},
+  {min:800,max:999,name:"SILVER",label:"シルバー",avg:6},
+  {min:1000,max:1199,name:"GOLD",label:"ゴールド",avg:8},
+  {min:1200,max:1399,name:"PLATINUM",label:"プラチナ",avg:10},
+  {min:1400,max:1599,name:"DIAMOND",label:"ダイヤモンド",avg:13},
+  {min:1600,max:1799,name:"MASTER",label:"マスター",avg:17},
+  {min:1800,max:1999,name:"GRANDMASTER",label:"グランドマスター",avg:22},
+  {min:2000,max:99999,name:"LEGEND",label:"レジェンド",avg:30}
+];
+const rankDistribution=[
+  {label:"ビギナー",pct:8},{label:"ブロンズ",pct:14},{label:"シルバー",pct:22},
+  {label:"ゴールド",pct:25},{label:"プラチナ",pct:16},{label:"ダイヤモンド",pct:8},
+  {label:"マスター",pct:4},{label:"グランドマスター",pct:2},{label:"レジェンド",pct:1}
+];
+function getRatingBand(rating=state.rankRating){
+  return rankRatingBands.find(b=>rating>=b.min&&rating<=b.max)||rankRatingBands[0];
+}
+function updateRankRating(){
+  if(selectedGameMode!=="rank"||state.rankAdjusted)return null;
+  state.rankAdjusted=true;
+  const cleared=Math.max(0,state.round-1);
+  const band=getRatingBand();
+  const diff=cleared-band.avg;
+  const requestedDelta=diff===0?0:(diff>0?Math.min(70,12+diff*8):Math.max(-70,-12+diff*8));
+  const beforeRating=Math.max(0,state.rankRating);
+  state.rankRating=Math.max(0,beforeRating+requestedDelta);
+  const delta=state.rankRating-beforeRating;
+  try{localStorage.setItem("fiveCardSoloRankRating",String(state.rankRating));}catch(_){}
+  state.lastRankDelta=delta;
+  return {delta,cleared,expected:band.avg};
+}
+function renderRankMeter(){
+  const band=getRatingBand();
+  const span=Math.max(1,band.max-band.min);
+  const pos=Math.max(0,Math.min(100,(state.rankRating-band.min)/span*100));
+  $("rankMeterContent").innerHTML=`
+    <div class="rank-rating-summary">
+      <div><small>現在ランク</small><strong class="rank-${band.name.toLowerCase()}">${band.label}</strong></div>
+      <div><small>ランクポイント</small><strong>${state.rankRating} RP</strong></div>
+      <div><small>このランクの範囲</small><strong>${band.min}–${band.max>=99999?"∞":band.max} RP</strong></div>
+    </div>
+    <div class="rank-position-wrap">
+      <div class="rank-position-label">
+        <span>${band.min} RP</span>
+        <strong>現在 ${state.rankRating} RP</strong>
+        <span>${band.max>=99999?"∞":band.max+" RP"}</span>
+      </div>
+      <div class="rank-position-track">
+        <div class="rank-position-fill" style="width:${pos}%"></div>
+        <div class="rank-position-dot" style="left:${pos}%"></div>
+      </div>
+    </div>
+    ${rankDistribution.map(item=>{
+      const meta=rankRatingBands.find(b=>b.label===item.label);
+      const current=meta&&meta.name===band.name;
+      return `
+      <div class="rank-distribution-row ${current?"current":""}">
+        <strong>${item.label}<span class="rank-range">${meta.min}–${meta.max>=99999?"∞":meta.max} RP</span></strong>
+        <div class="rank-distribution-track"><div class="rank-distribution-fill" style="width:${item.pct*4}%"></div></div>
+        <span>${item.pct}%</span>
+      </div>`;
+    }).join("")}
+    <p class="help">枠で強調されている行が現在のランクです。Solo Rank Playでは自分のランク帯の平均より上ならRP増加、下ならRP減少します。</p>`;
+}
+function openRankMeter(){renderRankMeter();$("rankMeterModal").classList.remove("hidden");}
+function closeRankMeter(){$("rankMeterModal").classList.add("hidden");}
+
+const state={
+  round:1,target:10,hp:100,maxHp:100,baseTime:30,playerName:"",rankRating:1000,sessionStartRating:1000,rankAdjusted:false,lastRankDelta:0,rarityLuck:0,perfectBonusRate:10,extraRewardPending:false,rewardQueue:[],
+  timeLeft:30,timeLimit:30,rerollsLeft:3,maxRerolls:3,
+  cards:[],chosen:[],roundResolved:false,gameOver:false,timerId:null,
+  specialCards:[],pendingReward:null,timeoutTick:0,history:[],ranking:[],
+  effects:{powerWeight:0,extraTime:0,extraRerolls:0,slowTimeout:false,roundHeal:0,plusWeight:0,mulWeight:0,targetReduce:0,damageReduce:0,revive:false,reviveUsed:false,timeoutEvery:1,lowHpHeal:0,perfectHeal:0,greatHeal:0,flatGuard:0,flatGuardUsed:false,freeFirstReroll:false,freeRerollUsed:false,rerollChance:null}
+};
+
+const $=id=>document.getElementById(id);
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+
+function weightedOperator(){
+  const currentWeights=currentOperatorWeights();
+  const weighted=operatorPool.map(op=>({
+    ...op,
+    actualWeight:currentWeights.find(item=>item.symbol===op.v)?.weight ?? op.weight
+  }));
+  const total=weighted.reduce((s,o)=>s+o.actualWeight,0);
+  let r=Math.random()*total;
+  for(const op of weighted){
+    r-=op.actualWeight;
+    if(r<=0)return op;
+  }
+  return weighted[0];
+}
+
+function pickTwoOps(){
+  const first=weightedOperator();
+  let second=weightedOperator();
+  let guard=0;
+  while(second.v===first.v && guard<12){
+    second=weightedOperator();
+    guard++;
+  }
+  return [first,second];
+}
+
+function currentTimeLimit(){
+  return 30+(state.effects.extraTime||0);
+}
+
+function makeHand(){
+  const nums=[rand(1,9),rand(1,9),rand(1,9)].map((n,i)=>({
+    id:"n"+i+"_"+Date.now(),type:"number",value:n,label:String(n),name:"NUMBER"
+  }));
+  const ops=pickTwoOps().map((o,i)=>({
+    id:"o"+i+"_"+Date.now(),type:"operator",value:o.v,label:o.label,name:o.name
+  }));
+  state.cards=[...nums,...ops].sort(()=>Math.random()-.5);
+  state.chosen=[];
+}
+
+function startGame(){
+  const enteredName=$("playerName").value.trim();
+  const nameError=$("nameError");
+  if(!enteredName){
+    if(nameError)nameError.classList.remove("hidden");
+    $("playerName").focus();
+    return;
+  }
+  if(nameError)nameError.classList.add("hidden");
+  playSound("start");
+  state.playerName=enteredName;
+  try{
+    const savedRating=localStorage.getItem("fiveCardSoloRankRating");
+    const parsedRating=savedRating===null?1000:Number(savedRating);
+    state.rankRating=Number.isFinite(parsedRating)?Math.max(0,parsedRating):1000;
+  }catch(_){
+    state.rankRating=1000;
+  }
+  state.sessionStartRating=state.rankRating;
+  state.rankAdjusted=false;
+  state.lastRankDelta=0;
+  state.rarityLuck=0;
+  state.perfectBonusRate=10;
+  state.extraRewardPending=false;
+  state.rewardQueue=[];
+  state.round=1;
+  state.target=10;
+  state.hp=100;
+  state.maxHp=100;
+  state.specialCards=[];
+  state.history=[];
+  state.lastClearedTarget=0;
+  state.effects={powerWeight:0,extraTime:0,extraRerolls:0,slowTimeout:false,roundHeal:0,plusWeight:0,mulWeight:0,targetReduce:0,damageReduce:0,revive:false,reviveUsed:false,timeoutEvery:1,lowHpHeal:0,perfectHeal:0,greatHeal:0,flatGuard:0,flatGuardUsed:false,freeFirstReroll:false,freeRerollUsed:false,rerollChance:null};
+  $("startScreen").classList.add("hidden");
+  $("gameScreen").classList.remove("hidden");
+  startRound();
+}
+
+function startRound(){
+  clearInterval(state.timerId);
+  state.roundResolved=false;
+  state.gameOver=false;
+  state.timeoutTick=0;
+  state.maxRerolls=3+state.effects.extraRerolls;
+  if(state.effects.rerollChance && Math.random()<state.effects.rerollChance[0]) state.maxRerolls+=state.effects.rerollChance[1];
+  state.rerollsLeft=state.maxRerolls;
+  state.effects.flatGuardUsed=false;
+  state.effects.freeRerollUsed=false;
+  if(state.effects.roundHeal>0){state.hp=Math.min(state.maxHp,state.hp+state.effects.roundHeal);}
+  if(state.effects.lowHpHeal>0 && state.hp<=30){state.hp=Math.min(state.maxHp,state.hp+state.effects.lowHpHeal);}
+  state.timeLimit=currentTimeLimit();
+  state.timeLeft=state.timeLimit;
+  try{
+    makeHand();
+  }catch(error){
+    console.error("カード配布エラー:",error);
+    show("カードの配布に失敗しました。ページを再読み込みしてください。","bad");
+    return;
+  }
+  $("nextRound").disabled=true;
+  $("gameover").classList.remove("show");
+  show("5枚すべてを使って目標以上の数字を作ろう。","");
+  render();
+  state.timerId=setInterval(tick,1000);
+}
+
+function tick(){
+  if(state.gameOver||state.roundResolved)return;
+  if(state.timeLeft>0){
+    state.timeLeft--;
+    if(state.timeLeft>0 && state.timeLeft<=5)playSound("tick");
+    if(state.timeLeft===0)show("時間切れ！ここから体力が減ります。","warn");
+  }else{
+    state.timeoutTick++;
+    const every=state.effects.timeoutEvery || (state.effects.slowTimeout?2:1);
+    if(state.timeoutTick%every===0){
+      damage(1,"時間切れダメージ");
+    }
+  }
+  renderStats();
+}
+
+function damage(amount,reason){
+  if(state.gameOver)return;
+  state.hp=Math.max(0,state.hp-amount);
+  playSound("damage",amount);
+  if(state.hp<=0 && state.effects.revive && !state.effects.reviveUsed){
+    state.effects.reviveUsed=true;
+    state.hp=1;
+    show("不死鳥の羽が発動！HP1で耐えた。","warn");
+    return;
+  }
+  if(state.hp<=0)endGame(reason);
+}
+
+function endGame(reason){
+  playSound("gameover");
+  state.gameOver=true;
+  state.roundResolved=true;
+  clearInterval(state.timerId);
+  $("gameover").classList.add("show");
+  const rankResult=updateRankRating();
+  const sessionBalance=state.rankRating-state.sessionStartRating;
+  const balanceSign=sessionBalance>0?"+":"";
+  const rankText=rankResult?` / 最終収支 ${balanceSign}${sessionBalance} RP（終了時 ${state.rankRating} RP）`:"";
+  $("gameoverText").textContent=`${reason}で体力が0になりました。到達ラウンド：${state.round}${rankText}`;
+  show(rankResult?`ランク結果：${rankResult.delta>=0?"+":""}${rankResult.delta} RP。現在 ${state.rankRating} RP`:"ゲームオーバー。最初からボタンで再挑戦できます。","bad");
+  showGameOverRateToast(rankResult);
+  submitScore();
+  render();
+}
+
+function expectedType(){
+  return state.chosen.length%2===0?"number":"operator";
+}
+
+function chooseCard(id){
+  if(state.gameOver||state.roundResolved)return;
+  const card=state.cards.find(c=>c.id===id);
+  if(!card||state.chosen.some(c=>c.id===id))return;
+  if(card.type!==expectedType()){
+    show(expectedType()==="number"?"次は数字カードです。":"次は記号カードです。","bad");
+    return;
+  }
+  state.chosen.push(card);
+  playSound("select");
+  render();
+}
+
+function undo(){
+  if(state.gameOver||state.roundResolved)return;
+  playSound("undo");
+  state.chosen.pop();
+  render();
+}
+
+function reroll(){
+  if(state.gameOver||state.roundResolved||state.rerollsLeft<=0)return;
+  playSound("reroll");
+  if(state.effects.freeFirstReroll && !state.effects.freeRerollUsed){state.effects.freeRerollUsed=true;}else{state.rerollsLeft--;}
+  makeHand();
+  show(`カードを引き直しました。残り${state.rerollsLeft}回。`,"warn");
+  render();
+}
+
+function apply(a,op,b){
+  if(op==="+")return a+b;
+  if(op==="-")return a-b;
+  if(op==="*")return a*b;
+  if(op==="/"){
+    if(b===0)throw new Error("0では割れません");
+    return a/b;
+  }
+  if(op==="%"){
+    if(b===0)throw new Error("0で余りは求められません");
+    return a%b;
+  }
+  if(op==="^"){
+    const v=Math.pow(a,b);
+    if(!Number.isFinite(v)||Math.abs(v)>1e12)throw new Error("数が大きすぎます");
+    return v;
+  }
+}
+
+function validateChosen(){
+  if(state.chosen.length!==5)throw new Error("5枚すべてを使ってください");
+  for(let i=0;i<5;i++){
+    const expected=i%2===0?"number":"operator";
+    if(state.chosen[i].type!==expected)throw new Error("数字と記号を交互に並べてください");
+  }
+}
+
+function evaluate(){
+  validateChosen();
+  const t=state.chosen;
+  let nums=[t[0].value,t[2].value,t[4].value];
+  let ops=[t[1].value,t[3].value];
+
+  for(let i=ops.length-1;i>=0;i--){
+    if(ops[i]==="^"){
+      nums[i]=apply(nums[i],"^",nums[i+1]);
+      nums.splice(i+1,1);
+      ops.splice(i,1);
+    }
+  }
+  for(let i=0;i<ops.length;){
+    if(["*","/","%"].includes(ops[i])){
+      nums[i]=apply(nums[i],ops[i],nums[i+1]);
+      nums.splice(i+1,1);
+      ops.splice(i,1);
+    }else i++;
+  }
+  let result=nums[0];
+  for(let i=0;i<ops.length;i++)result=apply(result,ops[i],nums[i+1]);
+  return result;
+}
+
+
+function evaluateCardsSequence(sequence){
+  const nums=[sequence[0].value,sequence[2].value,sequence[4].value];
+  const ops=[sequence[1].value,sequence[3].value];
+  for(let i=ops.length-1;i>=0;i--){
+    if(ops[i]==="^"){
+      nums[i]=apply(nums[i],"^",nums[i+1]);
+      nums.splice(i+1,1);
+      ops.splice(i,1);
+    }
+  }
+  for(let i=0;i<ops.length;){
+    if(["*","/","%"].includes(ops[i])){
+      nums[i]=apply(nums[i],ops[i],nums[i+1]);
+      nums.splice(i+1,1);
+      ops.splice(i,1);
+    }else i++;
+  }
+  let result=nums[0];
+  for(let i=0;i<ops.length;i++)result=apply(result,ops[i],nums[i+1]);
+  return result;
+}
+
+function permutations(items){
+  if(items.length<=1)return [items.slice()];
+  const result=[];
+  items.forEach((item,index)=>{
+    const rest=items.slice(0,index).concat(items.slice(index+1));
+    permutations(rest).forEach(p=>result.push([item,...p]));
+  });
+  return result;
+}
+
+function findRankedExpressions(){
+  const numbers=state.cards.filter(card=>card.type==="number");
+  const operators=state.cards.filter(card=>card.type==="operator");
+  const byValue=new Map();
+
+  for(const ns of permutations(numbers)){
+    for(const os of permutations(operators)){
+      const sequence=[ns[0],os[0],ns[1],os[1],ns[2]];
+      try{
+        const value=evaluateCardsSequence(sequence);
+        if(!Number.isFinite(value))continue;
+        const normalized=Math.round(value*1e9)/1e9;
+        if(!byValue.has(normalized)){
+          byValue.set(normalized,{
+            value,
+            expression:sequence.map(card=>card.label).join("")
+          });
+        }
+      }catch(_){}
+    }
+  }
+
+  return [...byValue.values()].sort((x,y)=>y.value-x.value);
+}
+
+function saveRankRating(){
+  state.rankRating=Math.max(0,Math.round(state.rankRating));
+  try{localStorage.setItem("fiveCardSoloRankRating",String(state.rankRating));}catch(_){}
+}
+
+let efficiencyOverlayTimer=null;
+function showEfficiencyToast(result){
+  const overlay=$("efficiencyOverlay");
+  const panel=$("efficiencyPanel");
+  const title=$("efficiencyTitle");
+  const guide=$("efficiencyGuide");
+  if(!overlay||!panel||!title||!guide){
+    console.error("判定トーストの要素が見つかりません");
+    return;
+  }
+
+  panel.className=`efficiency-panel ${result.kind}`;
+  title.textContent=result.title;
+
+  guide.classList.remove("hidden");
+  {
+    const rateText=selectedGameMode==="rank"
+      ? (result.delta>0?`<span style="color:#7CFF8A">レート +${result.delta}</span>`:
+        (result.delta<0?`<span style="color:#FF8A8A">レート ${result.delta}</span>`:`<span style="color:#CCCCCC">レート ±0</span>`))
+      : "";
+    guide.innerHTML=`最高値: <strong>${result.bestShown}</strong><br>作り方: <strong>${result.bestExpression}</strong>${rateText?`<br>${rateText}`:""}`;
+  }
+
+  clearTimeout(efficiencyOverlayTimer);
+  overlay.classList.remove("show");
+  overlay.setAttribute("aria-hidden","false");
+  void overlay.offsetWidth;
+  overlay.classList.add("show");
+
+  efficiencyOverlayTimer=setTimeout(()=>{
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden","true");
+  },3200);
+}
+
+function showGameOverRateToast(rankResult){
+  if(!rankResult)return;
+  const overlay=$("efficiencyOverlay");
+  const panel=$("efficiencyPanel");
+  const title=$("efficiencyTitle");
+  const guide=$("efficiencyGuide");
+  if(!overlay||!panel||!title||!guide)return;
+
+  const delta=rankResult.delta;
+  const sign=delta>0?"+":"";
+  const tone=delta>0?"positive":delta<0?"negative":"neutral";
+  const sessionBalance=state.rankRating-state.sessionStartRating;
+  const balanceSign=sessionBalance>0?"+":"";
+  const balanceTone=sessionBalance>0?"positive":sessionBalance<0?"negative":"neutral";
+  panel.className="efficiency-panel gameover-rate";
+  title.textContent="GAME OVER / RATE RESULT";
+  guide.classList.remove("hidden");
+  guide.innerHTML=`
+    <div class="gameover-rate-change ${balanceTone}">最終収支 ${balanceSign}${sessionBalance} RP</div>
+    <div class="gameover-rate-current">ゲームオーバー時変動 <strong class="${tone}">${sign}${delta} RP</strong></div>
+    <div class="gameover-rate-current">開始時 <strong>${state.sessionStartRating} RP</strong> → 終了時 <strong>${state.rankRating} RP</strong></div>
+    <div style="margin-top:8px;color:#aeb8ca;font-size:13px">到達ラウンド ${state.round} / 基準 ${rankResult.expected}R</div>`;
+
+  clearTimeout(efficiencyOverlayTimer);
+  overlay.classList.remove("show");
+  overlay.setAttribute("aria-hidden","false");
+  void overlay.offsetWidth;
+  overlay.classList.add("show");
+  efficiencyOverlayTimer=setTimeout(()=>{
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden","true");
+  },5200);
+}
+
+function applyEfficiencyResult(value){
+  const ranked=findRankedExpressions();
+  const tolerance=Math.max(1e-9,Math.abs(value)*1e-9);
+  let rankIndex=ranked.findIndex(item=>Math.abs(item.value-value)<=tolerance);
+  if(rankIndex<0)rankIndex=Math.max(0,ranked.length-1);
+
+  const best=ranked[0]||{value,expression:makeExpression()};
+  const before=state.rankRating;
+  let delta=0;
+  let kind="low";
+  let title="TOO LOW";
+  let luck=false;
+
+  if(rankIndex===0){
+    kind="perfect";
+    title="PERFECT";
+    if(selectedGameMode==="rank"){
+      delta=6+Math.round(Math.max(0,Math.min(1,state.timeLeft/state.timeLimit))*4);
+      state.rarityLuck=.15;
+      luck=true;
+    }
+    playSound("rare");
+  }else if(rankIndex===1){
+    if(selectedGameMode==="rank") delta=2+Math.round(Math.max(0,Math.min(1,state.timeLeft/state.timeLimit))*2);
+    kind="great";
+    title="GREAT";
+  }else if(rankIndex===2){
+    if(selectedGameMode==="rank") delta=state.timeLeft>state.timeLimit*.5?0:-1;
+    kind="good";
+    title="GOOD";
+  }else{
+    kind="low";
+    title="TOO LOW";
+    if(selectedGameMode==="rank")delta=-(4+Math.round((1-Math.max(0,Math.min(1,state.timeLeft/state.timeLimit)))*4));
+    playSound("damage",3);
+  }
+
+  if(selectedGameMode==="rank"){
+    state.rankRating=Math.max(0,state.rankRating+delta);
+    delta=state.rankRating-before;
+    saveRankRating();
+  }else{
+    delta=0;
+  }
+
+  const shown=n=>Number.isInteger(n)?n:Math.round(n*100)/100;
+
+  const result={
+    kind,title,rank:rankIndex+1,delta,luck,
+    bestShown:shown(best.value),
+    yoursShown:shown(value),
+    bestExpression:best.expression
+  };
+
+  showEfficiencyToast(result);
+  // 履歴は battle() 側でまとめて追加
+  return result;
+}
+
+
+function battle(){
+  if(state.gameOver||state.roundResolved)return;
+  try{
+    const value=evaluate();
+    const shown=Number.isInteger(value)?value:Math.round(value*100)/100;
+    const efficiencyResult=applyEfficiencyResult(value);
+    state.roundResolved=true;
+    clearInterval(state.timerId);
+    if(efficiencyResult.kind==="perfect" && state.effects.perfectHeal>0) state.hp=Math.min(state.maxHp,state.hp+state.effects.perfectHeal);
+    if((efficiencyResult.kind==="perfect"||efficiencyResult.kind==="great") && state.effects.greatHeal>0) state.hp=Math.min(state.maxHp,state.hp+state.effects.greatHeal);
+
+    const effectiveTarget=Math.max(1,Math.ceil(state.target*(1-state.effects.targetReduce)));
+    if(value>=effectiveTarget){
+      state.lastClearedTarget=effectiveTarget;
+      state.perfectBonusRate=Math.min(50,state.perfectBonusRate+3+(efficiencyResult.kind==="perfect"?5:0));
+      // 追加特殊カードは、成功したすべてのターンで現在確率を使って抽選する。
+      // PERFECTなら確率の増加量が大きいが、抽選自体は毎ターン行われる。
+      const bonusRoll=Math.random()*100;
+      if(bonusRoll<state.perfectBonusRate){
+        state.extraRewardPending=true;
+      }
+      playSound("success");
+      show(`成功！ ${makeExpression()} = ${shown}${efficiencyResult?` / ${efficiencyResult.title}`:""}`,"ok");
+      addHistory("success",`Round ${state.round}｜${efficiencyResult?efficiencyResult.title:"RESULT"}`,`あなた: ${makeExpression()} = ${shown}\n最高: ${efficiencyResult?efficiencyResult.bestExpression:"-"} = ${efficiencyResult?efficiencyResult.bestShown:"-"}\n目標: ${effectiveTarget}`);
+    }else{
+      const rawShortage=Math.ceil(effectiveTarget-value);
+      let shortage=Math.max(0,Math.ceil(rawShortage*(1-state.effects.damageReduce)));
+      if(state.effects.flatGuard>0 && !state.effects.flatGuardUsed){shortage=Math.max(0,shortage-state.effects.flatGuard);state.effects.flatGuardUsed=true;}
+      damage(shortage,"目標不足");
+      if(!state.gameOver)show(`${makeExpression()} = ${shown}。不足${shortage}で体力-${shortage}。${efficiencyResult?` ${efficiencyResult.title}。`:""}`,"bad");
+      addHistory("fail",`Round ${state.round}｜${efficiencyResult?efficiencyResult.title:"RESULT"}`,`あなた: ${makeExpression()} = ${shown}\n最高: ${efficiencyResult?efficiencyResult.bestExpression:"-"} = ${efficiencyResult?efficiencyResult.bestShown:"-"}\n不足: ${shortage}`);
+    }
+
+    if(!state.gameOver)$("nextRound").disabled=false;
+    render();
+  }catch(e){
+    show(e.message,"bad");
+  }
+}
+
+function nextRound(){
+  if(state.gameOver||!state.roundResolved)return;
+  playSound("next");
+  const finishedRound=state.round;
+  state.rewardQueue=[];
+  if(finishedRound%2===0) state.rewardQueue.push({bonus:false});
+  if(state.extraRewardPending){
+    state.rewardQueue.push({bonus:true});
+    state.extraRewardPending=false;
+  }
+  if(state.rewardQueue.length){
+    giveSpecialReward();
+    return;
+  }
+  advanceRound();
+}
+
+function advanceRound(){
+  state.round++;
+  state.target=Math.ceil(state.target*1.65);
+  startRound();
+}
+
+
+
+function submitScore(){
+  if(!state.playerName)return;
+
+  const newEntry={
+    name:state.playerName.trim(),
+    round:Math.max(0,state.round-1),
+    hp:state.hp,
+    lastTarget:state.lastClearedTarget||0,
+    rank:getSoloRank(Math.max(0,state.round-1)).label,
+    rankKey:getSoloRank(Math.max(0,state.round-1)).name,
+    time:Date.now()
+  };
+  const normalizedName=newEntry.name.toLocaleLowerCase("ja-JP");
+
+  const existingIndex=state.ranking.findIndex(entry=>
+    String(entry.name).trim().toLocaleLowerCase("ja-JP")===normalizedName
+  );
+
+  if(existingIndex===-1){
+    state.ranking.push(newEntry);
+  }else{
+    const oldEntry=state.ranking[existingIndex];
+    const isBetter=
+      newEntry.round>oldEntry.round ||
+      (newEntry.round===oldEntry.round && newEntry.hp>oldEntry.hp) ||
+      (newEntry.round===oldEntry.round && newEntry.hp===oldEntry.hp &&
+       newEntry.lastTarget>(oldEntry.lastTarget||0));
+
+    if(isBetter){
+      state.ranking[existingIndex]=newEntry;
+    }
+  }
+
+  state.ranking.sort((a,b)=>
+    b.round-a.round ||
+    b.hp-a.hp ||
+    (b.lastTarget||0)-(a.lastTarget||0) ||
+    a.time-b.time
+  );
+  state.ranking=state.ranking.slice(0,10);
+  renderRanking();
+}
+
+
+function currentOperatorWeights(){
+  return operatorPool.map(op=>({
+    symbol:op.v,
+    weight:Math.max(0.1,
+      op.weight
+      +(op.v==="^"?state.effects.powerWeight:0)
+      +(op.v==="+"?state.effects.plusWeight:0)
+      +(op.v==="*"?state.effects.mulWeight:0)
+    )
+  }));
+}
+
+
+
+function renderOperatorProbability(){
+  const box=$("operatorProbability");
+  if(!box)return;
+  const weights=currentOperatorWeights();
+  const total=weights.reduce((sum,item)=>sum+item.weight,0);
+  box.innerHTML="";
+  weights.forEach(item=>{
+    const percent=total>0 ? item.weight/total*100 : 0;
+    const row=document.createElement("div");
+    row.className="operator-prob-row";
+    row.innerHTML=`
+      <span class="operator-prob-symbol">${item.symbol}</span>
+      <span class="operator-percent">${percent.toFixed(1)}%</span>
+      <span class="operator-bar" aria-label="${item.symbol}の出現率 ${percent.toFixed(1)}%">
+        <span class="operator-bar-fill" style="width:${Math.max(2,percent).toFixed(2)}%"></span>
+      </span>`;
+    box.appendChild(row);
+  });
+}
+
+function renderRanking(){
+  const box=$("rankingList");
+  box.innerHTML="";
+  if(state.ranking.length===0){
+    box.innerHTML='<p class="history-empty">まだ記録はありません。</p>';
+    return;
+  }
+  state.ranking.forEach((entry,index)=>{
+    const row=document.createElement("div");
+    row.className="ranking-row"+(entry.name===state.playerName?" current":"");
+    row.innerHTML=`
+      <span class="rank-number">${index+1}</span>
+      <span class="rank-name">${escapeHtml(entry.name)}</span>
+      <span class="rank-score">
+      <strong>R${entry.round}</strong>
+      <small class="ranking-rank rank-${String(entry.rankKey||getSoloRank(entry.round).name).toLowerCase()}">${entry.rank||getSoloRank(entry.round).label}</small>
+      <small>必要数 ${entry.lastTarget||0} / HP ${entry.hp}</small>
+    </span>`;
+    box.appendChild(row);
+  });
+}
+
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g,ch=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  })[ch]);
+}
+
+const rarityMeta={
+  r1:{label:"JUNK",chance:"25%"},
+  r2:{label:"COMMON",chance:"20%"},
+  r3:{label:"UNCOMMON",chance:"15%"},
+  r4:{label:"RARE",chance:"12%"},
+  r5:{label:"HEROIC",chance:"10%"},
+  r6:{label:"EPIC",chance:"7%"},
+  r7:{label:"LEGENDARY",chance:"5%"},
+  r8:{label:"DIVINE",chance:"3%"},
+  r9:{label:"CELESTIAL",chance:"2%"},
+  r10:{label:"MYTHIC",chance:"1%"}
+};
+
+function openRarityCatalog(rarity){
+  const meta=rarityMeta[rarity];
+  const cards=specialPool.filter(card=>card.rarity===rarity);
+  $("rarityModalTitle").textContent=meta.label;
+  $("rarityModalChance").textContent=`レアリティ抽選確率：${meta.chance}　収録カード：${cards.length}種類`;
+  const list=$("rarityCardList");
+  list.innerHTML="";
+  cards.forEach(card=>{
+    const el=document.createElement("article");
+    el.className=`catalog-card ${card.rarity}`;
+    el.innerHTML=`
+      <span class="rarity-badge ${card.rarity}">${card.rarityLabel}</span>
+      <div class="catalog-icon">${card.icon}</div>
+      <strong>${card.name}</strong>
+      <p>${card.description}</p>`;
+    list.appendChild(el);
+  });
+  $("rarityModal").classList.remove("hidden");
+  $("rarityModal").setAttribute("aria-hidden","false");
+}
+
+function closeRarityCatalog(){
+  const modal=$("rarityModal");
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden","true");
+}
+
+function addHistory(type,title,detail){
+  state.history.unshift({type,title,detail});
+  state.history=state.history.slice(0,30);
+  renderHistory();
+}
+
+function applySpecialEffect(card){
+  const e=state.effects, v=card.value;
+  switch(card.effect){
+    case "extraRerolls": e.extraRerolls+=v; break;
+    case "powerWeight": e.powerWeight+=v; break;
+    case "plusWeight": e.plusWeight+=v; break;
+    case "mulWeight": e.mulWeight+=v; break;
+    case "roundHeal": e.roundHeal+=v; break;
+    case "extraTime": e.extraTime+=v; break;
+    case "lowHpHeal": e.lowHpHeal+=v; break;
+    case "perfectHeal": e.perfectHeal+=v; break;
+    case "greatHeal": e.greatHeal+=v; break;
+    case "flatGuard": e.flatGuard+=v; break;
+    case "freeFirstReroll": e.freeFirstReroll=true; break;
+    case "rerollChance":
+      if(!e.rerollChance || v[0]>e.rerollChance[0]) e.rerollChance=v;
+      break;
+    case "timeAndTimeout": e.extraTime+=v[0]; e.timeoutEvery=Math.max(e.timeoutEvery,2+v[1]); break;
+    case "targetReduce": e.targetReduce=Math.min(.35,e.targetReduce+v); break;
+    case "damageReduce": e.damageReduce=Math.min(.55,e.damageReduce+v); break;
+    case "slowTimeout":
+      e.slowTimeout=true;
+      e.timeoutEvery=Math.max(e.timeoutEvery,2);
+      break;
+    case "timeout3":
+      e.timeoutEvery=Math.max(e.timeoutEvery,3);
+      break;
+    case "maxHp":
+      state.maxHp+=v;
+      state.hp=Math.min(state.maxHp,state.hp+v);
+      break;
+    case "maxHpHeal":
+      state.maxHp+=v;
+      state.hp=Math.min(state.maxHp,state.hp+v);
+      break;
+    case "powerMul":
+      e.powerWeight+=v;
+      e.mulWeight+=v;
+      break;
+    case "revive":
+      e.revive=true;
+      break;
+    case "maxHpRoundHeal":
+      state.maxHp+=v[0];
+      state.hp=Math.min(state.maxHp,state.hp+v[0]);
+      e.roundHeal+=v[1];
+      break;
+    case "targetHeal":
+      e.targetReduce=Math.min(.35,e.targetReduce+v[0]);
+      e.roundHeal+=v[1];
+      break;
+    case "powerTarget":
+      e.powerWeight+=v[0];
+      e.targetReduce=Math.min(.35,e.targetReduce+v[1]);
+      break;
+    case "rerollTarget":
+      e.extraRerolls+=v[0];
+      e.targetReduce=Math.min(.35,e.targetReduce+v[1]);
+      break;
+    case "healPower":
+      e.roundHeal+=v[0];
+      e.powerWeight+=v[1];
+      break;
+  }
+  renderOperatorProbability();
+}
+
+function renderHistory(){
+  const box=$("historyList");
+  box.innerHTML="";
+  if(state.history.length===0){
+    box.innerHTML='<p class="history-empty">まだ履歴はありません。</p>';
+    return;
+  }
+  state.history.forEach(item=>{
+    const d=document.createElement("div");
+    d.className=`history-item ${item.type}`;
+    d.innerHTML=`<strong>${item.title}</strong><small>${item.detail}</small>`;
+    box.appendChild(d);
+  });
+}
+
+function weightedSpecialReward(){
+  const baseWeights={r1:25,r2:20,r3:15,r4:12,r5:10,r6:7,r7:5,r8:3,r9:2,r10:1};
+  const luckMultiplier=1+Math.max(0,state.rarityLuck);
+  const rarityWeights=Object.fromEntries(
+    Object.entries(baseWeights).map(([tier,weight])=>[
+      tier,
+      Number(tier.slice(1))>=4?weight*luckMultiplier:weight
+    ])
+  );
+  const tiers=Object.entries(rarityWeights);
+  const total=tiers.reduce((s,[,w])=>s+w,0);
+  let roll=Math.random()*total;
+  let chosen="r1";
+  for(const [tier,w] of tiers){
+    roll-=w;
+    if(roll<=0){chosen=tier;break;}
+  }
+  const candidates=specialPool.filter(c=>c.rarity===chosen);
+  return candidates[Math.floor(Math.random()*candidates.length)];
+}
+
+function giveSpecialReward(){
+  const queueItem=state.rewardQueue.shift() || {bonus:false};
+  const reward=weightedSpecialReward();
+  state.rarityLuck=0;
+  state.pendingReward={...reward,isPerfectBonus:queueItem.bonus};
+
+  const modal=$("specialModal");
+  const rewardCard=modal.querySelector(".special-reward");
+  const bonusBanner=$("rewardBonusBanner");
+  const heading=$("rewardHeading");
+
+  if(queueItem.bonus){
+    // 追加カードが実際に表示された瞬間に確率をリセットする。
+    state.perfectBonusRate=0;
+    heading.textContent="追加特殊カード獲得！";
+    bonusBanner.classList.remove("hidden");
+    rewardCard.className=`special-reward special-card perfect-bonus-reward ${reward.rarity}`;
+  }else{
+    heading.textContent="特殊カード獲得！";
+    bonusBanner.classList.add("hidden");
+    rewardCard.className=`special-reward special-card ${reward.rarity}`;
+  }
+
+  $("rewardIcon").textContent=reward.icon;
+  $("rewardName").textContent=reward.name;
+  $("rewardDescription").textContent=reward.description;
+  $("rewardRarity").textContent=reward.rarityLabel;
+  $("rewardRarity").className=`reward-rarity rarity-badge ${reward.rarity}`;
+  modal.classList.toggle("perfect-bonus-modal",queueItem.bonus);
+  modal.classList.remove("hidden");
+  render();
+}
+
+function acceptReward(){
+  const reward=state.pendingReward;
+  if(!reward)return;
+  state.specialCards.push(reward);
+  raritySound(reward);
+  applySpecialEffect(reward);
+  addHistory('reward',`${reward.isPerfectBonus?'PERFECT BONUS｜':''}${reward.rarityLabel}獲得`,`${reward.name}：${reward.description}`);
+  state.pendingReward=null;
+  renderSpecials();
+  if(state.rewardQueue.length){
+    giveSpecialReward();
+  }else{
+    $("specialModal").classList.add("hidden");
+    advanceRound();
+  }
+}
+
+function moveInArray(arr,from,to){
+  const [item]=arr.splice(from,1);
+  arr.splice(to,0,item);
+}
+
+function setupDrag(container,itemsGetter,rerender){
+  let fromIndex=null;
+  container.querySelectorAll("[draggable='true']").forEach((el,index)=>{
+    el.addEventListener("dragstart",e=>{
+      fromIndex=index;el.classList.add("dragging");
+      if(el.dataset.cardId)e.dataTransfer.setData("text/card-id",el.dataset.cardId);
+      e.dataTransfer.effectAllowed="move";
+    });
+    el.addEventListener("dragend",()=>{
+      fromIndex=null;
+      document.querySelectorAll(".dragging,.drop-target,.drop-active").forEach(x=>x.classList.remove("dragging","drop-target","drop-active"));
+    });
+    el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drop-target");});
+    el.addEventListener("dragleave",()=>el.classList.remove("drop-target"));
+    el.addEventListener("drop",e=>{
+      e.preventDefault();
+      const draggedCardId=e.dataTransfer.getData("text/card-id");
+      if(container.id==="expression"&&draggedCardId){chooseCard(draggedCardId);return;}
+      const toIndex=[...container.children].indexOf(el);
+      if(fromIndex===null||toIndex<0||fromIndex===toIndex)return;
+      moveInArray(itemsGetter(),fromIndex,toIndex);rerender();
+    });
+  });
+}
+function setupExpressionDrop(){
+  const expression=$("expression");
+  expression.addEventListener("dragover",e=>{
+    if(e.dataTransfer.types.includes("text/card-id")){e.preventDefault();expression.classList.add("drop-active");}
+  });
+  expression.addEventListener("dragleave",e=>{if(!expression.contains(e.relatedTarget))expression.classList.remove("drop-active");});
+  expression.addEventListener("drop",e=>{
+    const cardId=e.dataTransfer.getData("text/card-id");
+    if(!cardId)return;
+    e.preventDefault();expression.classList.remove("drop-active");chooseCard(cardId);
+  });
+}
+function makeExpression(){
+  return state.chosen.map(c=>c.label).join("");
+}
+
+function show(text,type){
+  $("message").className="message "+type;
+  $("message").textContent=text;
+}
+
+function renderStats(){
+  $("round").textContent=state.round;
+  $("target").textContent=Math.max(1,Math.ceil(state.target*(1-state.effects.targetReduce)));
+  $("hp").textContent=`${state.hp} / ${state.maxHp}`;
+  $("time").textContent=Math.max(0,state.timeLeft);
+  $("rerolls").textContent=`${state.rerollsLeft} / ${state.maxRerolls}`;
+  $("hpBar").style.width=Math.max(0,state.hp/state.maxHp*100)+"%";
+  $("timeBar").style.width=Math.max(0,state.timeLeft/state.timeLimit*100)+"%";
+  $("timeBar").className="timefill"+(state.timeLeft<=5?" danger":"");
+  const bonusRate=$("perfectBonusRate");
+  if(bonusRate){
+    bonusRate.textContent=`${state.perfectBonusRate}%`;
+    bonusRate.title=`ターン成功時、${state.perfectBonusRate}%で追加特殊カードを獲得`;
+  }
+}
+
+function renderSpecials(){
+  const box=$("specials");
+  box.innerHTML="";
+  $("specialEmpty").classList.toggle("hidden",state.specialCards.length>0);
+  state.specialCards.forEach(card=>{
+    const d=document.createElement("div");
+    d.className=`special-card ${card.rarity}`;
+    d.innerHTML=`<span class="rarity-badge ${card.rarity}">${card.rarityLabel}</span><strong>${card.icon} ${card.name}</strong><small>${card.description}</small>`;
+    box.appendChild(d);
+  });
+}
+
+function render(){
+  renderStats();
+  renderSpecials();
+  renderCurrentMode();
+  renderCurrentRank();
+  renderOperatorProbability();
+  renderRanking();
+  renderHistory();
+
+  $("cards").innerHTML="";
+  state.cards.forEach(card=>{
+    const b=document.createElement("button");
+    b.className="cardbtn";
+    b.dataset.cardId=card.id;
+    b.draggable=!state.gameOver&&!state.roundResolved;
+    if(state.chosen.some(c=>c.id===card.id))b.classList.add("used");
+    b.disabled=state.gameOver||state.roundResolved||state.chosen.some(c=>c.id===card.id);
+
+    const top=document.createElement("span");
+    top.className="cardtype";
+    top.textContent=card.type==="number"?"NUMBER":"OPERATOR";
+    const bottom=document.createElement("span");
+    bottom.className="cardfoot";
+    bottom.textContent=card.name;
+
+    b.appendChild(top);
+    b.appendChild(document.createTextNode(card.label));
+    b.appendChild(bottom);
+    b.addEventListener("click",()=>chooseCard(card.id));
+    $("cards").appendChild(b);
+  });
+  setupDrag($("cards"),()=>state.cards,render);
+
+  $("expression").innerHTML="";
+  if(state.chosen.length===0){
+    $("expression").textContent="カードを順番に選択";
+  }else{
+    state.chosen.forEach(card=>{
+      const s=document.createElement("span");
+      s.className="token";
+      s.textContent=card.label;
+      s.draggable=!state.gameOver&&!state.roundResolved;
+      $("expression").appendChild(s);
+    });
+    setupDrag($("expression"),()=>state.chosen,render);
+  }
+
+  $("calculate").disabled=state.gameOver||state.roundResolved||state.chosen.length!==5;
+  $("undo").disabled=state.gameOver||state.roundResolved||state.chosen.length===0;
+  $("reroll").disabled=state.gameOver||state.roundResolved||state.rerollsLeft<=0;
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+
+const soundToggle=$("soundToggle");
+if(soundToggle){
+  soundToggle.addEventListener("click",()=>{
+    soundEnabled=!soundEnabled;
+    soundToggle.textContent=soundEnabled?"🔊 効果音 ON":"🔇 効果音 OFF";
+    soundToggle.setAttribute("aria-pressed",String(soundEnabled));
+    if(soundEnabled)playSound("select");
+  });
+}
+
+const soloModeButton=$("soloModeButton");
+const rankModeButton=$("rankModeButton");
+function selectMode(mode){
+  selectedGameMode=mode;
+  soloModeButton.classList.toggle("selected",mode==="solo");
+  rankModeButton.classList.toggle("selected",mode==="rank");
+  $("startButtonText").textContent=mode==="rank"?"Solo Rank Playを開始":"Solo Playを開始";
+  playSound("select");
+}
+soloModeButton.addEventListener("click",()=>selectMode("solo"));
+rankModeButton.addEventListener("click",()=>selectMode("rank"));
+
+$("startButton").addEventListener("click",startGame);
+
+
+$("playerName").addEventListener("input",()=>{
+  if($("playerName").value.trim())$("nameError")?.classList.add("hidden");
+});
+
+$("playerName").addEventListener("keydown",e=>{
+  if(e.key==="Enter")startGame();
+});
+document.querySelectorAll(".pyramid-tier[data-rarity]").forEach(button=>{
+  button.addEventListener("click",()=>openRarityCatalog(button.dataset.rarity));
+});
+$("closeRarityModal").addEventListener("click",closeRarityCatalog);
+$("rarityModal").addEventListener("click",e=>{
+  if(e.target===$("rarityModal"))closeRarityCatalog();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){closeRarityCatalog();closeRankMeter();}
+});
+
+setupExpressionDrop();
+$("currentRank").addEventListener("click",openRankMeter);
+$("closeRankMeter").addEventListener("click",closeRankMeter);
+$("rankMeterModal").addEventListener("click",e=>{if(e.target===$("rankMeterModal"))closeRankMeter();});
+
+$("undo").addEventListener("click",undo);
+$("calculate").addEventListener("click",battle);
+$("reroll").addEventListener("click",reroll);
+$("nextRound").addEventListener("click",nextRound);
+$("restart").addEventListener("click",()=>{
+  if(selectedGameMode==="rank"&&!state.rankAdjusted){
+    const result=updateRankRating();
+    if(result){
+      show(`この記録で ${result.delta>=0?"+":""}${result.delta} RP。現在 ${state.rankRating} RP`,"warn");
+    }
+  }
+  $("playerName").value=state.playerName || $("playerName").value;
+  startGame();
+});
+$("acceptReward").addEventListener("click",acceptReward);
+function returnToTitle(){
+  clearInterval(state.timerId);
+  clearTimeout(efficiencyOverlayTimer);
+
+  let finalText="プレイを終了しました。";
+  let cls="neutral";
+  if(selectedGameMode==="rank"&&!state.rankAdjusted){
+    const result=updateRankRating();
+    if(result){
+      const sign=result.delta>0?"+":"";
+      finalText=`今回の記録で終了：${sign}${result.delta} RP → 現在 ${state.rankRating} RP`;
+      cls=result.delta>0?"positive":result.delta<0?"negative":"neutral";
+      addHistory("rank","ランク戦終了",`${sign}${result.delta} RP / 現在 ${state.rankRating} RP`);
+    }
+  }
+
+  const notice=$("titleResultNotice");
+  if(notice){
+    notice.textContent=finalText;
+    notice.className=`title-result-notice ${cls}`;
+  }
+
+  $("efficiencyOverlay")?.classList.remove("show");
+  $("efficiencyOverlay")?.setAttribute("aria-hidden","true");
+  $("gameover")?.classList.remove("show");
+  $("rewardModal")?.classList.add("hidden");
+  $("rarityModal")?.classList.add("hidden");
+  $("rankMeterModal")?.classList.add("hidden");
+  $("gameScreen")?.classList.add("hidden");
+  $("startScreen")?.classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"instant"});
+}
+
+$("backTitle")?.addEventListener("click",returnToTitle);
+// 画面更新で個別リスナーが外れてもタイトルボタンを確実に拾う。
+document.addEventListener("click",event=>{
+  const button=event.target.closest?.("#backTitle");
+  if(!button)return;
+  event.preventDefault();
+  returnToTitle();
+});
+
+});
+</script>
+
+
+<div id="efficiencyOverlay" class="efficiency-overlay" aria-live="assertive" aria-hidden="true">
+  <div id="efficiencyPanel" class="efficiency-panel">
+    <div id="efficiencyTitle" class="efficiency-title">PERFECT</div>
+    <div id="efficiencyGuide" class="efficiency-guide hidden"></div>
+  </div>
+</div>
+
+
+<!-- Balance update:
+- PERFECT: +6~10 RP
+- GREAT: +2~4 RP
+- GOOD: 0~-1 RP
+- TOO LOW: -4~-8 RP
+- HP regen reduced to 3.
+- PERFECT BONUS: rolls on every cleared turn, starts at 10%, +3% per clear, +5% more on PERFECT, caps at 50%, and resets to 0% when the bonus card is shown.
+-->
+
+<!--
+Recommended rarity balance:
+Common: small consistent effects (3-8% mitigation, +1 draw every few rounds, +2 HP/round)
+Rare: medium combat boosts (10-15%, conditional bonuses)
+Epic: strong build-around effects (combo, cooldown reduction, duplicate reward)
+Legendary: game-changing but conditional (once per battle revive, perfect streak bonus, unique mechanics)
+Never grant permanent rarity multipliers.
+-->
+</body>
+</html>
