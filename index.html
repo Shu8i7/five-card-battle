@@ -1338,6 +1338,93 @@ button.warn{background:#4a3918;border-color:#886e31}
     </div>
     <button id="cancelOnlineMatch" class="action" type="button">キャンセル</button>
   </div>
+
+  <section id="onlineChoicePanel" class="custom-room-panel hidden">
+    <div class="custom-room-choice-grid">
+      <button id="quickMatchButton" class="action primary" type="button">クイックマッチ</button>
+      <button id="openCreateRoomButton" class="action" type="button">カスタムルームを作る</button>
+      <button id="openJoinRoomButton" class="action" type="button">ルームに参加</button>
+    </div>
+  </section>
+
+  <section id="customRoomSetupPanel" class="custom-room-panel hidden">
+    <div id="customCreateArea" class="custom-room-area hidden">
+      <h3>カスタムルームを作成</h3>
+      <label class="custom-field">
+        <span>最大人数</span>
+        <select id="customMaxPlayers">
+          <option value="2">2人</option>
+          <option value="3">3人</option>
+          <option value="4" selected>4人</option>
+          <option value="5">5人</option>
+          <option value="6">6人</option>
+          <option value="7">7人</option>
+          <option value="8">8人</option>
+        </select>
+      </label>
+      <label class="custom-check">
+        <input id="customPasswordEnabled" type="checkbox">
+        <span>パスワードを設定する</span>
+      </label>
+      <label id="customCreatePasswordRow" class="custom-field hidden">
+        <span>パスワード</span>
+        <input id="customCreatePassword" type="password" maxlength="24" autocomplete="new-password" placeholder="1〜24文字">
+      </label>
+      <div class="custom-room-actions">
+        <button id="createCustomRoomButton" class="action primary" type="button">部屋を立てる</button>
+        <button class="action customSetupBack" type="button">戻る</button>
+      </div>
+    </div>
+
+    <div id="customJoinArea" class="custom-room-area hidden">
+      <h3>カスタムルームに参加</h3>
+
+      <div class="custom-room-browser-head">
+        <strong>参加できるルーム</strong>
+        <button id="refreshCustomRoomList" class="action" type="button">更新</button>
+      </div>
+
+      <div id="customRoomList" class="custom-room-list">
+        <p class="help">ルーム一覧を読み込んでいます...</p>
+      </div>
+
+      <div id="customPasswordJoinPanel" class="custom-password-join-panel hidden">
+        <div>
+          <small>PASSWORD REQUIRED</small>
+          <strong id="customPasswordRoomLabel">ROOM ------</strong>
+        </div>
+        <label class="custom-field">
+          <span>パスワード</span>
+          <input id="customListPassword" type="password" maxlength="24" autocomplete="current-password" placeholder="パスワードを入力">
+        </label>
+        <div class="custom-room-actions">
+          <button id="customListPasswordJoinButton" class="action primary" type="button">この部屋に入る</button>
+          <button id="customListPasswordCancelButton" class="action" type="button">キャンセル</button>
+        </div>
+      </div>
+
+      <div class="custom-room-actions">
+        <button class="action customSetupBack" type="button">戻る</button>
+      </div>
+    </div>
+    <p id="customRoomSetupMessage" class="help"></p>
+  </section>
+
+  <section id="customRoomLobby" class="custom-room-lobby hidden" aria-live="polite">
+    <div class="custom-room-lobby-head">
+      <div>
+        <small>CUSTOM ROOM</small>
+        <h3>ROOM <strong id="customRoomCodeLabel">------</strong></h3>
+      </div>
+      <span id="customRoomLockLabel" class="custom-room-badge">公開</span>
+    </div>
+    <p id="customRoomStatusText" class="help">参加者を待っています...</p>
+    <div id="customRoomMembers" class="custom-room-members"></div>
+    <div class="custom-room-actions">
+      <button id="customRoomStartButton" class="action primary hidden" type="button">このメンバーで開始</button>
+      <button id="customRoomLeaveButton" class="action" type="button">ルームを退出</button>
+    </div>
+  </section>
   <button id="startButton" type="button"><span id="startButtonText">Solo Playを開始</span></button>
 
 <section class="rank-guide">
@@ -1561,6 +1648,13 @@ button.warn{background:#4a3918;border-color:#886e31}
             <strong id="onlineOpponentResult">—</strong>
             <span id="onlineOpponentExpression">5問の合計ポイント</span>
             <span class="online-result-time">合計回答時間 <strong id="onlineOpponentTime">—</strong></span>
+          </div>
+        </div>
+        <div id="customMultiResult" class="custom-multi-result hidden">
+          <h3>カスタムルーム順位</h3>
+          <div id="customMultiRanking" class="custom-multi-ranking"></div>
+          <div class="custom-graph-actions">
+            <button id="customOptimalGraphButton" class="action" type="button">最適解グラフを見る</button>
           </div>
         </div>
         <div class="online-result-chart-wrap">
@@ -2903,8 +2997,678 @@ const onlineBattleState={
   syncId:null,
   startAtMs:0,
   gameStarted:false,
-  myQueueProfile:null
+  myQueueProfile:null,
+  mySessionId:"",
+  opponentSessionId:"",
+  battleKind:"quick"
 };
+
+const customRoomState={
+  active:false,
+  roomCode:"",
+  selectedJoinRoomCode:"",
+  sessionId:"",
+  isHost:false,
+  room:null,
+  members:[],
+  playersAtStart:[],
+  pollId:null,
+  heartbeatId:null,
+  resultPollId:null,
+  completedResults:[]
+};
+
+
+function customStopTimers(){
+  clearInterval(customRoomState.pollId);
+  clearInterval(customRoomState.heartbeatId);
+  clearInterval(customRoomState.resultPollId);
+  customRoomState.pollId=null;
+  customRoomState.heartbeatId=null;
+  customRoomState.resultPollId=null;
+}
+
+function customShowSetupMessage(message,bad=false){
+  const el=$("customRoomSetupMessage");
+  if(!el)return;
+  el.textContent=message||"";
+  el.className=bad?"help custom-room-error":"help";
+}
+
+function customResetTitlePanels(){
+  $("customRoomSetupPanel")?.classList.add("hidden");
+  $("customRoomLobby")?.classList.add("hidden");
+  $("customCreateArea")?.classList.add("hidden");
+  $("customJoinArea")?.classList.add("hidden");
+  customShowSetupMessage("");
+}
+
+function showOnlineChoices(){
+  customResetTitlePanels();
+  $("onlineLobbyPanel")?.classList.add("hidden");
+  $("onlineChoicePanel")?.classList.remove("hidden");
+}
+
+async function refreshCustomRoomList(){
+  const box=$("customRoomList");
+  if(!box)return;
+
+  customRoomState.selectedJoinRoomCode="";
+  $("customPasswordJoinPanel")?.classList.add("hidden");
+  $("customListPassword").value="";
+  box.innerHTML='<p class="help">ルーム一覧を読み込んでいます...</p>';
+
+  try{
+    const rooms=await window.firebaseBridge.listCustomRooms();
+    if(!rooms.length){
+      box.innerHTML='<p class="help">現在参加できるルームはありません。</p>';
+      return;
+    }
+
+    box.innerHTML="";
+    rooms.forEach(room=>{
+      const row=document.createElement("button");
+      row.type="button";
+      row.className="custom-room-list-row custom-room-list-button";
+
+      const info=document.createElement("div");
+      info.className="custom-room-list-info";
+
+      const title=document.createElement("strong");
+      title.textContent=`ROOM ${room.roomCode}`;
+
+      const meta=document.createElement("span");
+      meta.textContent=`${room.memberCount}/${room.maxPlayers}人`;
+
+      const host=document.createElement("small");
+      host.textContent=`ホスト: ${room.hostName||"Player"}`;
+
+      const lock=document.createElement("b");
+      lock.className="custom-room-list-lock";
+      lock.textContent=room.passwordEnabled?"🔒 PASSWORD":"OPEN";
+
+      info.append(title,meta,host);
+      row.append(info,lock);
+
+      row.addEventListener("click",()=>{
+        customRoomState.selectedJoinRoomCode=room.roomCode;
+
+        if(room.passwordEnabled){
+          $("customPasswordRoomLabel").textContent=`ROOM ${room.roomCode}`;
+          $("customPasswordJoinPanel").classList.remove("hidden");
+          $("customListPassword").value="";
+          $("customListPassword").focus();
+          customShowSetupMessage("このルームはパスワードが設定されています。");
+          return;
+        }
+
+        joinListedCustomRoom(room.roomCode,"");
+      });
+
+      box.appendChild(row);
+    });
+  }catch(error){
+    console.warn("custom room list error",error);
+    box.innerHTML=`<p class="help custom-room-error">${error?.message||"ルーム一覧を取得できませんでした。"}</p>`;
+  }
+}
+
+async function joinListedCustomRoom(roomCode,password){
+  try{
+    const name=$("playerName").value.trim();
+    if(!name){
+      $("nameError")?.classList.remove("hidden");
+      $("playerName").focus();
+      return;
+    }
+
+    customShowSetupMessage("ルームに参加しています...");
+    const data=await window.firebaseBridge.joinCustomRoom({
+      roomCode,
+      password,
+      displayName:name
+    });
+    customRoomState.selectedJoinRoomCode="";
+    $("customPasswordJoinPanel")?.classList.add("hidden");
+    await enterCustomRoomLobby(data);
+  }catch(error){
+    customShowSetupMessage(error?.message||"ルームに参加できませんでした。",true);
+  }
+}
+
+function customOpenSetup(kind){
+  $("onlineChoicePanel")?.classList.add("hidden");
+  $("customRoomSetupPanel")?.classList.remove("hidden");
+  $("customCreateArea")?.classList.toggle("hidden",kind!=="create");
+  $("customJoinArea")?.classList.toggle("hidden",kind!=="join");
+  customShowSetupMessage("");
+  if(kind==="join")refreshCustomRoomList();
+}
+
+function customRenderLobby(){
+  const room=customRoomState.room||{};
+  const members=customRoomState.members||[];
+  $("customRoomCodeLabel").textContent=customRoomState.roomCode||"------";
+  $("customRoomLockLabel").textContent=room.passwordEnabled?"🔒 パスワードあり":"公開";
+  $("customRoomStatusText").textContent=
+    `${members.length} / ${room.maxPlayers||8}人参加中${customRoomState.isHost?"・あなたがホストです":""}`;
+
+  const box=$("customRoomMembers");
+  if(box){
+    box.innerHTML="";
+    members.forEach((member,index)=>{
+      const row=document.createElement("div");
+      row.className="custom-room-member";
+      const left=document.createElement("div");
+      left.innerHTML=`<small>${member.isHost?"HOST":`PLAYER ${index+1}`}</small><strong></strong><span></span>`;
+      left.querySelector("strong").textContent=member.name||"Player";
+      left.querySelector("span").textContent=`${member.rateLabel||ratingLabel(member.rating)} / ${Math.round(Number(member.rating)||100)} RP`;
+      const status=document.createElement("b");
+      status.textContent="READY";
+      row.append(left,status);
+      box.appendChild(row);
+    });
+  }
+  const start=$("customRoomStartButton");
+  if(start){
+    start.classList.toggle("hidden",!customRoomState.isHost);
+    start.disabled=members.length<2||room.status!=="waiting";
+  }
+}
+
+async function customRefreshRoom(){
+  if(!customRoomState.active||!customRoomState.roomCode)return;
+  try{
+    const data=await window.firebaseBridge.loadCustomRoom(customRoomState.roomCode);
+    if(!data?.room){
+      customShowSetupMessage("ルームが見つかりません。",true);
+      return;
+    }
+    customRoomState.room=data.room;
+    customRoomState.members=data.members||[];
+    customRenderLobby();
+
+    if(data.room.status==="closed"){
+      const reason=data.room.closedReason==="host_left"
+        ?"ホストが退出したため、ルームは解散しました。"
+        :"ホストがルームを閉じたため、ルームは解散しました。";
+      await leaveCustomRoomToTitle(reason,{skipRemoteLeave:true});
+      return;
+    }
+
+    // Even if the host closed the tab/browser and could not write "closed",
+    // the room heartbeat tells every remaining participant that the host vanished.
+    const hostStillHere=(data.members||[]).some(member=>
+      member.sessionId===data.room.hostSessionId && member.isHost
+    );
+    if(data.room.status==="waiting" && !hostStillHere){
+      await leaveCustomRoomToTitle(
+        "ホストとの接続が切れたため、ルームは解散しました。",
+        {skipRemoteLeave:false}
+      );
+      return;
+    }
+
+    if(data.room.status==="playing" && onlineBattleState.battleKind!=="custom"){
+      customRoomState.playersAtStart=(data.members||[]).slice();
+      await beginCustomRoomBattle(data.room,data.members||[]);
+    }
+  }catch(error){
+    console.warn("custom room refresh error",error);
+  }
+}
+
+function customStartLobbyLoops(){
+  customStopTimers();
+  customRefreshRoom();
+  customRoomState.pollId=setInterval(customRefreshRoom,500);
+  const beat=async()=>{
+    if(!customRoomState.active)return;
+    try{
+      await window.firebaseBridge.touchCustomRoomMember(customRoomState.roomCode,customRoomState.sessionId);
+    }catch(error){
+      console.warn("custom room heartbeat error",error);
+    }
+  };
+  beat();
+  customRoomState.heartbeatId=setInterval(beat,2000);
+}
+
+async function enterCustomRoomLobby(data){
+  customRoomState.active=true;
+  customRoomState.roomCode=data.roomCode;
+  customRoomState.sessionId=data.sessionId;
+  customRoomState.isHost=Boolean(data.isHost);
+  customRoomState.room=data.room||null;
+  customRoomState.members=data.members||[];
+  $("onlineChoicePanel")?.classList.add("hidden");
+  $("customRoomSetupPanel")?.classList.add("hidden");
+  $("customRoomLobby")?.classList.remove("hidden");
+  customRenderLobby();
+  customStartLobbyLoops();
+}
+
+async function createCustomRoomFromUI(){
+  try{
+    const name=$("playerName").value.trim();
+    if(!name){$("nameError")?.classList.remove("hidden");return;}
+    const enabled=$("customPasswordEnabled").checked;
+    const password=enabled?$("customCreatePassword").value:"";
+    if(enabled&&!password){customShowSetupMessage("パスワードを入力してください。",true);return;}
+    const data=await window.firebaseBridge.createCustomRoom({
+      displayName:name,
+      password,
+      maxPlayers:Number($("customMaxPlayers").value)||4
+    });
+    await enterCustomRoomLobby(data);
+  }catch(error){
+    customShowSetupMessage(error?.message||"ルームを作成できませんでした。",true);
+  }
+}
+
+async function leaveCustomRoomToTitle(message="ルームを退出しました。",options={}){
+  customStopTimers();
+  if(customRoomState.active && !options.skipRemoteLeave){
+    try{
+      await window.firebaseBridge.leaveCustomRoom(
+        customRoomState.roomCode,
+        customRoomState.sessionId,
+        customRoomState.isHost
+      );
+    }catch(error){console.warn("custom leave error",error);}
+  }
+  customRoomState.active=false;
+  customRoomState.roomCode="";
+  customRoomState.sessionId="";
+  customRoomState.isHost=false;
+  customRoomState.room=null;
+  customRoomState.members=[];
+  customRoomState.playersAtStart=[];
+  onlineBattleState.battleKind="quick";
+  $("customRoomLobby")?.classList.add("hidden");
+  $("onlineBattleScreen")?.classList.add("hidden");
+  $("startScreen")?.classList.remove("hidden");
+  if(selectedGameMode==="online")showOnlineChoices();
+  const notice=$("titleResultNotice");
+  if(notice){notice.textContent=message;notice.className="title-result-notice neutral";}
+}
+
+async function startCustomRoomAsHost(){
+  try{
+    await window.firebaseBridge.startCustomRoom(customRoomState.roomCode,customRoomState.sessionId);
+  }catch(error){
+    $("customRoomStatusText").textContent=error?.message||"開始できませんでした。";
+  }
+}
+
+function customStartedAtMs(room){
+  const value=room?.startedAt;
+  if(value?.toMillis)return value.toMillis();
+  if(Number.isFinite(Number(value?.seconds))){
+    return Number(value.seconds)*1000+Math.floor(Number(value.nanoseconds||0)/1e6);
+  }
+  return Number(room?.startedAtMs)||Date.now();
+}
+
+async function beginCustomRoomBattle(room,members){
+  customStopTimers();
+  onlineBattleState.battleKind="custom";
+  onlineBattleState.matchId=`custom_${customRoomState.roomCode}`;
+  onlineBattleState.user=window.firebaseBridge.getUser();
+  onlineBattleState.opponent=null;
+  onlineBattleState.mySessionId=customRoomState.sessionId;
+  onlineBattleState.opponentSessionId="";
+  onlineBattleState.forfeitHandled=false;
+
+  const seed=String(room.seed||customRoomState.roomCode);
+  onlineBattleState.challenges=Array.from({length:5},(_,i)=>createOnlineChallenge(`${seed}_q${i+1}`));
+  const first=onlineBattleState.challenges[0];
+  onlineBattleState.roundIndex=0;
+  onlineBattleState.roundResults=[];
+  onlineBattleState.cards=first.cards;
+  onlineBattleState.chosen=[];
+  onlineBattleState.target=first.target;
+  onlineBattleState.timeLeft=30;
+  onlineBattleState.startedAtMs=0;
+  onlineBattleState.startAtMs=customStartedAtMs(room)+5000;
+  onlineBattleState.gameStarted=false;
+  onlineBattleState.submitted=false;
+  onlineBattleState.result=null;
+
+  $("customRoomLobby")?.classList.add("hidden");
+  $("startScreen")?.classList.add("hidden");
+  $("gameScreen")?.classList.add("hidden");
+  $("onlineBattleScreen")?.classList.remove("hidden");
+  $("onlineExitButton")?.classList.add("hidden");
+  $("onlineResultPanel")?.classList.add("hidden");
+  $("customMultiResult")?.classList.add("hidden");
+  $("onlineResultChart")?.closest(".online-result-chart-wrap")?.classList.remove("hidden");
+
+  const account=window.firebaseBridge?.getAccountDisplayProfile?.()||{};
+  $("onlineYouName").textContent=account.name||$("playerName").value||"Player";
+  $("onlineOpponentName").textContent=`${Math.max(1,members.length-1)}人の対戦相手`;
+  $("onlineYouStatus").textContent="準備完了";
+  $("onlineOpponentStatus").textContent=`${members.length}人参加`;
+  $("onlineBattleMessage").className="message";
+  $("onlineBattleMessage").textContent="カスタムルーム対戦を開始します。";
+  onlineRender();
+
+  const overlay=$("onlineSyncOverlay");
+  overlay?.classList.remove("hidden");
+  $("onlineSyncYouName").textContent=account.name||"YOU";
+  $("onlineSyncYouRate").textContent=account.rateLabel||"—";
+  $("onlineSyncYouRP").textContent=account.rpText||"—";
+  $("onlineSyncOpponentName").textContent=`ROOM ${customRoomState.roomCode}`;
+  $("onlineSyncOpponentRate").textContent=`${members.length} PLAYERS`;
+  $("onlineSyncOpponentRP").textContent="CUSTOM";
+  $("onlineSyncCount").textContent="READY";
+  $("onlineSyncText").textContent="全員同じ開始時刻でスタート";
+
+  const update=()=>{
+    const diff=onlineBattleState.startAtMs-Date.now();
+    if(diff<=0){
+      $("onlineSyncCount").textContent="START!";
+      onlineStartGameTimerFromSharedClock();
+      return;
+    }
+    $("onlineSyncCount").textContent=String(Math.max(1,Math.ceil(diff/1000)));
+  };
+  update();
+  onlineBattleState.syncId=setInterval(update,50);
+}
+
+function customTimeoutResult(member){
+  return {
+    uid:member.uid,
+    sessionId:member.sessionId,
+    name:member.name,
+    rounds:Array.from({length:5},(_,i)=>({round:i+1,value:null,expression:"",elapsedMs:30000,timedOut:true})),
+    elapsedMs:30000,
+    timedOut:true
+  };
+}
+
+function customScoreResult(result){
+  let total=0;
+  for(let i=0;i<5;i++){
+    total+=onlineScoreRound(result?.rounds?.[i],onlineBattleState.challenges[i]).points;
+  }
+  return total;
+}
+
+function renderCustomOptimalGraph(complete){
+  const svg=$("onlineResultChart");
+  if(!svg)return;
+
+  const W=760,H=320;
+  const left=52,right=18,top=30,bottom=48;
+  const plotW=W-left-right,plotH=H-top-bottom;
+
+  const palette=[
+    "#42c96b","#ef5555","#5f8fff","#f1b84b",
+    "#b56cff","#41c7c7","#f07cc6","#a7b35d"
+  ];
+
+  function cumulativeTimes(result){
+    const out=[];
+    let total=0;
+    for(let i=0;i<5;i++){
+      const round=result?.rounds?.[i];
+      if(round?.timedOut){
+        total=30;
+      }else{
+        total+=Math.max(0,Number(round?.elapsedMs)||0)/1000;
+        total=Math.min(30,total);
+      }
+      out.push(total);
+    }
+    return out;
+  }
+
+  function detailsFor(result){
+    return Array.from({length:5},(_,i)=>
+      onlineScoreRound(result?.rounds?.[i],onlineBattleState.challenges[i])
+    );
+  }
+
+  function cumulativePoints(details){
+    const out=[];
+    let total=0;
+    for(let i=0;i<5;i++){
+      total+=Number(details?.[i]?.points)||0;
+      out.push(total);
+    }
+    return out;
+  }
+
+  const series=complete.map((item,index)=>{
+    const details=detailsFor(item.result);
+    return {
+      ...item,
+      details,
+      xs:cumulativeTimes(item.result),
+      ys:cumulativePoints(details),
+      color:palette[index%palette.length],
+      index
+    };
+  });
+
+  const maxY=Math.max(
+    100,
+    ...series.flatMap(s=>s.ys),
+    20
+  );
+  const yTop=Math.ceil(maxY/10)*10;
+  const x=v=>left+(Math.max(0,Math.min(30,v))/30)*plotW;
+  const y=v=>top+plotH-(Math.max(0,Math.min(yTop,v))/yTop)*plotH;
+
+  const esc=s=>String(s??"").replace(/[&<>"']/g,ch=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[ch]));
+
+  const pieces=[];
+  pieces.push(`<rect x="0" y="0" width="${W}" height="${H}" rx="12" fill="#0b1422"/>`);
+
+  for(let i=0;i<=5;i++){
+    const value=Math.round(yTop*i/5);
+    const yy=y(value);
+    pieces.push(`<line x1="${left}" y1="${yy}" x2="${W-right}" y2="${yy}" stroke="#26344b" stroke-width="1"/>`);
+    pieces.push(`<text x="${left-9}" y="${yy+4}" text-anchor="end" fill="#8290a8" font-size="10">${value}</text>`);
+  }
+
+  for(let sec=0;sec<=30;sec+=5){
+    const xx=x(sec);
+    pieces.push(`<line x1="${xx}" y1="${top}" x2="${xx}" y2="${top+plotH}" stroke="#1d2a3d" stroke-width="1"/>`);
+    pieces.push(`<text x="${xx}" y="${H-18}" text-anchor="middle" fill="#8290a8" font-size="10">${sec}</text>`);
+  }
+
+  pieces.push(`<line x1="${left}" y1="${top+plotH}" x2="${W-right}" y2="${top+plotH}" stroke="#64748b"/>`);
+  pieces.push(`<line x1="${left}" y1="${top}" x2="${left}" y2="${top+plotH}" stroke="#64748b"/>`);
+  pieces.push(`<text x="${left+plotW/2}" y="${H-3}" text-anchor="middle" fill="#a8b5ca" font-size="11" font-weight="700">経過時間（秒）</text>`);
+  pieces.push(`<text x="13" y="${top+plotH/2}" text-anchor="middle" fill="#a8b5ca" font-size="11" font-weight="700" transform="rotate(-90 13 ${top+plotH/2})">累計最適解ポイント（pt）</text>`);
+
+  function pathFor(xs,ys){
+    let d=`M ${x(0)} ${y(0)}`;
+    for(let i=0;i<5;i++)d+=` L ${x(xs[i])} ${y(ys[i])}`;
+    return d;
+  }
+
+  series.forEach(s=>{
+    pieces.push(`<path d="${pathFor(s.xs,s.ys)}" fill="none" stroke="${s.color}" stroke-width="${s.index===0?3.5:2.5}" stroke-linecap="round" stroke-linejoin="round"/>`);
+
+    for(let i=0;i<5;i++){
+      const round=s.result?.rounds?.[i]||{};
+      const detail=s.details[i]||{};
+      const meta={
+        player:s.member?.name||"Player",
+        q:i+1,
+        points:Number(detail.points)||0,
+        rank:Number(detail.rank)||0,
+        timeout:Boolean(detail.timeout),
+        value:round.value,
+        expression:round.expression||"",
+        elapsedMs:Number(round.elapsedMs)||0
+      };
+      const payload=encodeURIComponent(JSON.stringify(meta));
+      const cx=x(s.xs[i]),cy=y(s.ys[i]);
+      const optimal=!meta.timeout&&meta.rank===1;
+
+      if(optimal){
+        pieces.push(`<circle class="online-optimal-pulse" cx="${cx}" cy="${cy}" r="9" fill="none" stroke="${s.color}" stroke-width="2"/>`);
+        pieces.push(`<circle class="online-optimal-ring" cx="${cx}" cy="${cy}" r="11" fill="none" stroke="${s.color}" stroke-width="1.5"/>`);
+      }
+
+      pieces.push(`<circle class="online-chart-point${optimal?" is-optimal":""}" data-custom-point="${payload}" cx="${cx}" cy="${cy}" r="${optimal?7:5.5}" fill="${s.color}" stroke="${optimal?"#ffffff":"#0b1422"}" stroke-width="${optimal?2.5:2}" tabindex="0"/>`);
+      pieces.push(`<circle class="online-chart-hit" data-custom-point="${payload}" cx="${cx}" cy="${cy}" r="13" fill="transparent" tabindex="0"/>`);
+    }
+  });
+
+  // Compact legend.
+  let legendX=left+4,legendY=14;
+  series.slice(0,8).forEach((s,index)=>{
+    if(index===4){legendX=left+345;legendY=14;}
+    const offset=index%4;
+    const yy=legendY+offset*0; // keep one-row compact legend
+    const xx=legendX+(offset%4)*82;
+    pieces.push(`<line x1="${xx}" y1="${yy}" x2="${xx+18}" y2="${yy}" stroke="${s.color}" stroke-width="3"/>`);
+    pieces.push(`<text x="${xx+23}" y="${yy+4}" fill="#dbe6f7" font-size="9">${esc(String(s.member?.name||"Player").slice(0,8))}</text>`);
+  });
+
+  svg.innerHTML=pieces.join("");
+
+  const tooltip=$("onlineChartTooltip");
+  const stage=svg.closest(".online-result-chart-stage");
+
+  function showPointDetail(target){
+    if(!tooltip||!stage||!target?.dataset?.customPoint)return;
+    let meta;
+    try{meta=JSON.parse(decodeURIComponent(target.dataset.customPoint));}catch(_){return;}
+
+    const rankText=meta.timeout
+      ? `${meta.rank}番目扱い`
+      : meta.rank===1
+        ? "1番目（最適解）"
+        : `${meta.rank}番目`;
+
+    const valueText=meta.timeout?"TIME OUT":String(meta.value??"—");
+    const expressionText=meta.expression||"—";
+    const timeText=`${(Math.max(0,meta.elapsedMs)/1000).toFixed(2)}秒`;
+
+    tooltip.innerHTML=`
+      <div class="online-chart-tooltip-title">${esc(meta.player)}・Q${meta.q}</div>
+      <div class="online-chart-tooltip-grid">
+        <span>ポイント</span><strong>${meta.points}pt</strong>
+        <span>最適解から</span><strong>${rankText}</strong>
+        <span>回答値</span><strong>${esc(valueText)}</strong>
+        <span>回答時間</span><strong>${timeText}</strong>
+        <span>式</span><strong>${esc(expressionText)}</strong>
+      </div>`;
+
+    const svgRect=svg.getBoundingClientRect();
+    const stageRect=stage.getBoundingClientRect();
+    const cx=Number(target.getAttribute("cx"))||0;
+    const cy=Number(target.getAttribute("cy"))||0;
+    const px=(cx/760)*svgRect.width+(svgRect.left-stageRect.left);
+    const py=(cy/320)*svgRect.height+(svgRect.top-stageRect.top);
+
+    tooltip.style.left=`${Math.max(8,Math.min(stageRect.width-230,px+12))}px`;
+    tooltip.style.top=`${Math.max(8,py-24)}px`;
+    tooltip.classList.remove("hidden");
+  }
+
+  svg.querySelectorAll("[data-custom-point]").forEach(el=>{
+    el.addEventListener("mouseenter",()=>showPointDetail(el));
+    el.addEventListener("focus",()=>showPointDetail(el));
+    el.addEventListener("click",event=>{
+      event.stopPropagation();
+      showPointDetail(el);
+    });
+  });
+}
+
+function toggleCustomOptimalGraph(){
+  const wrap=$("onlineResultChart")?.closest(".online-result-chart-wrap");
+  const button=$("customOptimalGraphButton");
+  if(!wrap||!button)return;
+
+  const opening=wrap.classList.contains("hidden");
+  if(opening){
+    renderCustomOptimalGraph(customRoomState.completedResults||[]);
+    wrap.classList.remove("hidden");
+    button.textContent="最適解グラフを閉じる";
+    requestAnimationFrame(()=>wrap.scrollIntoView({behavior:"smooth",block:"nearest"}));
+  }else{
+    wrap.classList.add("hidden");
+    button.textContent="最適解グラフを見る";
+    $("onlineChartTooltip")?.classList.add("hidden");
+  }
+}
+
+function showCustomRoomResults(results){
+  onlineStopSync();
+  onlineStopPresence();
+  customStopTimers();
+  const expected=customRoomState.playersAtStart||[];
+  const bySession=new Map((results||[]).map(r=>[r.sessionId,r]));
+  const complete=expected.map(member=>{
+    const result=bySession.get(member.sessionId)||customTimeoutResult(member);
+    return {
+      member,
+      result,
+      score:customScoreResult(result),
+      elapsedMs:Number(result.elapsedMs)||30000
+    };
+  }).sort((a,b)=>b.score-a.score||a.elapsedMs-b.elapsedMs||String(a.member.name).localeCompare(String(b.member.name)));
+
+  customRoomState.completedResults=complete;
+  const myIndex=complete.findIndex(x=>x.member.sessionId===customRoomState.sessionId);
+  $("onlineResultTitle").textContent=myIndex===0?"YOU WIN":`${myIndex+1}位`;
+  $("onlineResultPanel").classList.remove("hidden");
+  $("customMultiResult").classList.remove("hidden");
+  $("onlineResultChart")?.closest(".online-result-chart-wrap")?.classList.add("hidden");
+  if($("customOptimalGraphButton"))$("customOptimalGraphButton").textContent="最適解グラフを見る";
+  $("onlineResultReason").classList.add("hidden");
+  $("onlineYourResult").textContent=myIndex>=0?`${complete[myIndex].score} pt`:"—";
+  $("onlineYourExpression").textContent="5問の合計ポイント";
+  $("onlineYourTime").textContent=myIndex>=0?`${(complete[myIndex].elapsedMs/1000).toFixed(2)}秒`:"—";
+  $("onlineOpponentResult").textContent=`${complete.length}人`;
+  $("onlineOpponentExpression").textContent="参加人数";
+  $("onlineOpponentTime").textContent="";
+
+  const ranking=$("customMultiRanking");
+  ranking.innerHTML="";
+  complete.forEach((item,index)=>{
+    const row=document.createElement("div");
+    row.className=`custom-ranking-row${item.member.sessionId===customRoomState.sessionId?" you":""}${index===0?" winner":""}`;
+    row.innerHTML=`<span class="custom-rank-place">${index+1}</span><div><strong></strong><small></small></div><b>${item.score} pt</b><span>${(item.elapsedMs/1000).toFixed(2)}s</span>`;
+    row.querySelector("strong").textContent=item.member.name||"Player";
+    row.querySelector("small").textContent=`${item.member.rateLabel||ratingLabel(item.member.rating)} / ${Math.round(Number(item.member.rating)||100)} RP`;
+    ranking.appendChild(row);
+  });
+  $("onlineBattleMessage").textContent="カスタムルーム対戦終了";
+  if(myIndex===0)playSound("success");
+}
+
+function startCustomResultPolling(){
+  clearInterval(customRoomState.resultPollId);
+  const deadline=onlineBattleState.startAtMs+35000;
+  const check=async()=>{
+    try{
+      const results=await window.firebaseBridge.loadCustomRoomResults(customRoomState.roomCode);
+      const expected=customRoomState.playersAtStart||[];
+      if(results.length>=expected.length || Date.now()>=deadline){
+        clearInterval(customRoomState.resultPollId);
+        showCustomRoomResults(results);
+      }else{
+        $("onlineBattleMessage").textContent=`結果待ち... ${results.length}/${expected.length}人`;
+      }
+    }catch(error){
+      console.warn("custom result polling error",error);
+    }
+  };
+  check();
+  customRoomState.resultPollId=setInterval(check,500);
+}
 
 function onlineHashSeed(str){
   let h=2166136261>>>0;
@@ -3197,18 +3961,23 @@ function onlineBuildOutcomeRanking(challenge){
   return outcomes.map((o,index)=>({
     ...o,
     rank:index+1,
-    points:20-index
+    // New scoring: 20, 17, 14, 11, ... and never below 0.
+    points:Math.max(0,20-index*3)
   }));
 }
 
 function onlineScoreRound(round,challenge){
   const ranking=onlineBuildOutcomeRanking(challenge);
-  const timeoutPoints=20-ranking.length; // one point below the worst legal answer
+
+  // Unanswered / invalid answers are ranked one place below the worst legal answer.
+  // Scoring follows the same -3 progression and is clamped at 0.
+  const fallbackRank=ranking.length+1;
+  const fallbackPoints=Math.max(0,20-(fallbackRank-1)*3);
 
   if(!round || round.timedOut || round.value===null || !Number.isFinite(Number(round.value))){
     return {
-      rank:ranking.length+1,
-      points:timeoutPoints,
+      rank:fallbackRank,
+      points:fallbackPoints,
       timeout:true,
       totalRanks:ranking.length,
       best:ranking[0]||null,
@@ -3229,10 +3998,10 @@ function onlineScoreRound(round,challenge){
   }
 
   // Defensive fallback: an answer that cannot be reproduced from the five cards
-  // is treated just below the worst legal result.
+  // is treated exactly like one place below the worst legal answer.
   return {
-    rank:ranking.length+1,
-    points:timeoutPoints,
+    rank:fallbackRank,
+    points:fallbackPoints,
     timeout:false,
     totalRanks:ranking.length,
     best:ranking[0]||null,
@@ -3464,6 +4233,8 @@ function renderOnlineResultChart({me,opponent,myDetails,opDetails,myScore,opScor
 function onlineShowResult(me,opponent){
   onlineStopSync();
   onlineStopPresence();
+  $("customMultiResult")?.classList.add("hidden");
+  $("onlineResultChart")?.closest(".online-result-chart-wrap")?.classList.remove("hidden");
   $("onlineResultChart")?.classList.remove("hidden");
   const pair=[me,opponent].slice().sort((x,y)=>String(x.uid||"").localeCompare(String(y.uid||"")));
   const compare=onlineCompareFiveRounds(pair[0],pair[1]);
@@ -3593,8 +4364,15 @@ async function onlineSendFinalFiveRoundResult(forcedTimeout){
   onlineRender();
 
   try{
-    await window.firebaseBridge.submitOnlineBattleResult(onlineBattleState.matchId,result);
-    onlineStartResultPolling();
+    if(onlineBattleState.battleKind==="custom"){
+      result.sessionId=customRoomState.sessionId;
+      result.name=window.firebaseBridge?.getAccountDisplayProfile?.().name||$("playerName").value||"Player";
+      await window.firebaseBridge.submitCustomRoomResult(customRoomState.roomCode,customRoomState.sessionId,result);
+      startCustomResultPolling();
+    }else{
+      await window.firebaseBridge.submitOnlineBattleResult(onlineBattleState.matchId,result);
+      onlineStartResultPolling();
+    }
   }catch(error){
     $("onlineBattleMessage").className="message bad";
     $("onlineBattleMessage").textContent=error?.message||"回答の送信に失敗しました。";
@@ -3633,18 +4411,31 @@ async function onlineCheckPresence(){
     const status=await window.firebaseBridge.getOnlineBattleStatus(onlineBattleState.matchId);
     const myUid=onlineBattleState.user?.uid;
     const opponentUid=onlineBattleState.opponent?.uid;
+    const mySessionId=onlineBattleState.mySessionId;
+    const opponentSessionId=onlineBattleState.opponentSessionId;
+
     if(status?.forfeit?.loserUid){
-      onlineShowForfeitResult(status.forfeit.winnerUid===myUid);
+      // Only apply a forfeit result when it belongs to THIS exact match session.
+      if(
+        status.forfeit.loserSessionId===mySessionId ||
+        status.forfeit.winnerSessionId===mySessionId
+      ){
+        onlineShowForfeitResult(status.forfeit.winnerSessionId===mySessionId);
+      }
       return;
     }
-    const opponentLast=Number(status?.presence?.[opponentUid])||0;
-    // Heartbeat is every 2 seconds. Give 7 seconds to survive brief network jitter.
+
+    const opponentLast=Number(status?.presenceSessions?.[opponentSessionId])||0;
     if(opponentLast && Date.now()-opponentLast>7000){
-      const forfeit=await window.firebaseBridge.recordOnlineForfeit(onlineBattleState.matchId,opponentUid);
-      onlineShowForfeitResult(forfeit.winnerUid===myUid);
+      const forfeit=await window.firebaseBridge.recordOnlineForfeit(
+        onlineBattleState.matchId,
+        opponentUid,
+        opponentSessionId,
+        mySessionId
+      );
+      onlineShowForfeitResult(forfeit.winnerSessionId===mySessionId);
     }
   }catch(error){
-    // Do not award a win just because this client temporarily lost its own connection.
     console.warn("接続状態確認エラー",error);
   }
 }
@@ -3653,7 +4444,7 @@ function onlineStartPresence(){
   const beat=async()=>{
     if(!onlineBattleState.matchId||onlineBattleState.forfeitHandled)return;
     try{
-      await window.firebaseBridge.touchOnlineBattlePresence(onlineBattleState.matchId);
+      await window.firebaseBridge.touchOnlineBattlePresence(onlineBattleState.matchId,onlineBattleState.mySessionId);
       await onlineCheckPresence();
     }catch(error){
       console.warn("Online Battle heartbeat error",error);
@@ -3838,6 +4629,7 @@ async function onlineWaitForSynchronizedStart(matchData){
 }
 
 async function onlineBeginMatch(pair){
+  onlineBattleState.battleKind="quick";
   onlineBattleState.matching=false;
   clearInterval(onlineBattleState.pollId);
 
@@ -3845,6 +4637,8 @@ async function onlineBeginMatch(pair){
   const myQueueProfile=pair.players.find(p=>p.uid===myUser.uid)||null;
   const opponent=pair.players.find(p=>p.uid!==myUser.uid);
   onlineBattleState.myQueueProfile=myQueueProfile;
+  onlineBattleState.mySessionId=String(myQueueProfile?.sessionId||"");
+  onlineBattleState.opponentSessionId=String(opponent?.sessionId||"");
 
   if(myQueueProfile && !Number.isFinite(Number(myQueueProfile.rating))){
     console.warn("自分の待機データにratingがありません。",myQueueProfile);
@@ -3861,6 +4655,7 @@ async function onlineBeginMatch(pair){
     matchId,
     players:pair.players.map(p=>p.uid),
     names:Object.fromEntries(pair.players.map(p=>[p.uid,p.name])),
+    playerSessions:Object.fromEntries(pair.players.map(p=>[p.uid,p.sessionId])),
     target:challenge.target,
     cards:challenge.cards.map(c=>({type:c.type,value:c.value,label:c.label,name:c.name,id:c.id}))
   });
@@ -3872,6 +4667,7 @@ async function onlineBeginMatch(pair){
     matchId,
     opponent,
     userUid:myUser.uid,
+    mySessionId:onlineBattleState.mySessionId,
     savedAtMs:Date.now()
   }));
   onlineBattleState.challenges=challenges;
@@ -3968,10 +4764,16 @@ async function onlineRecoverDisconnectedMatch(){
   if(!user||user.uid!==saved.userUid)return;
   try{
     const status=await window.firebaseBridge.getOnlineBattleStatus(saved.matchId);
-    if(status?.forfeit?.loserUid===user.uid){
+    if(
+      status?.forfeit?.loserUid===user.uid &&
+      status?.forfeit?.loserSessionId &&
+      status.forfeit.loserSessionId===saved.mySessionId
+    ){
       onlineBattleState.matchId=saved.matchId;
       onlineBattleState.user=user;
       onlineBattleState.opponent=saved.opponent;
+      onlineBattleState.mySessionId=String(saved.mySessionId||"");
+      onlineBattleState.opponentSessionId=String(saved.opponent?.sessionId||"");
       $("startScreen")?.classList.add("hidden");
       $("gameScreen")?.classList.add("hidden");
       $("onlineBattleScreen")?.classList.remove("hidden");
@@ -3991,6 +4793,10 @@ setTimeout(onlineRecoverDisconnectedMatch,1500);
 setTimeout(onlineRecoverDisconnectedMatch,3500);
 
 function onlineReturnToTitle(){
+  if(onlineBattleState.battleKind==="custom"&&customRoomState.active){
+    leaveCustomRoomToTitle("カスタムルームを退出しました。");
+    return;
+  }
   onlineStopSync();
   onlineStopPresence();
   clearInterval(onlineBattleState.timerId);
@@ -4110,7 +4916,16 @@ function selectMode(mode){
       mode==="rank"?"Solo RankはGoogleログイン必須。RPとプレイヤー名をアカウントに保存します。":
       "Solo Playはログインなしでも遊べます。ログイン中はオンライン最高記録も保存されます。";
   }
-  if(mode!=="online")$("onlineLobbyPanel")?.classList.add("hidden");
+  if(mode==="online"){
+    $("startButton")?.classList.add("hidden");
+    showOnlineChoices();
+  }else{
+    $("startButton")?.classList.remove("hidden");
+    $("onlineChoicePanel")?.classList.add("hidden");
+    $("customRoomSetupPanel")?.classList.add("hidden");
+    $("customRoomLobby")?.classList.add("hidden");
+    $("onlineLobbyPanel")?.classList.add("hidden");
+  }
   renderRanking();
   playSound("select");
 }
@@ -4119,7 +4934,7 @@ rankModeButton.addEventListener("click",()=>selectMode("rank"));
 onlineModeButton.addEventListener("click",()=>selectMode("online"));
 $("refreshRanking")?.addEventListener("click",()=>renderRanking());
 
-$("startButton").addEventListener("click",()=>selectedGameMode==="online"?startOnlineMatchmaking():startGame());
+$("startButton").addEventListener("click",()=>startGame());
 
 
 $("playerName").addEventListener("input",()=>{
@@ -4127,7 +4942,7 @@ $("playerName").addEventListener("input",()=>{
 });
 
 $("playerName").addEventListener("keydown",e=>{
-  if(e.key==="Enter")(selectedGameMode==="online"?startOnlineMatchmaking():startGame());
+  if(e.key==="Enter"&&selectedGameMode!=="online")startGame();
 });
 document.querySelectorAll(".pyramid-tier[data-rarity]").forEach(button=>{
   button.addEventListener("click",()=>openRarityCatalog(button.dataset.rarity));
@@ -4193,12 +5008,52 @@ function returnToTitle(){
   window.scrollTo({top:0,behavior:"instant"});
 }
 
+$("quickMatchButton")?.addEventListener("click",()=>{
+  $("onlineChoicePanel")?.classList.add("hidden");
+  startOnlineMatchmaking();
+});
+$("openCreateRoomButton")?.addEventListener("click",()=>customOpenSetup("create"));
+$("openJoinRoomButton")?.addEventListener("click",()=>customOpenSetup("join"));
+$("refreshCustomRoomList")?.addEventListener("click",refreshCustomRoomList);
+$("customListPasswordJoinButton")?.addEventListener("click",()=>{
+  const roomCode=customRoomState.selectedJoinRoomCode;
+  if(!roomCode)return;
+  joinListedCustomRoom(roomCode,$("customListPassword").value);
+});
+$("customListPasswordCancelButton")?.addEventListener("click",()=>{
+  customRoomState.selectedJoinRoomCode="";
+  $("customPasswordJoinPanel")?.classList.add("hidden");
+  $("customListPassword").value="";
+  customShowSetupMessage("");
+});
+$("customListPassword")?.addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    const roomCode=customRoomState.selectedJoinRoomCode;
+    if(roomCode)joinListedCustomRoom(roomCode,event.target.value);
+  }
+});
+document.querySelectorAll(".customSetupBack").forEach(button=>button.addEventListener("click",showOnlineChoices));
+$("customPasswordEnabled")?.addEventListener("change",()=>{
+  $("customCreatePasswordRow")?.classList.toggle("hidden",!$("customPasswordEnabled").checked);
+});
+$("createCustomRoomButton")?.addEventListener("click",createCustomRoomFromUI);
+$("customRoomStartButton")?.addEventListener("click",startCustomRoomAsHost);
+$("customRoomLeaveButton")?.addEventListener("click",()=>{
+  if(customRoomState.isHost){
+    const ok=confirm("ホストが退出すると、このルームは解散します。退出しますか？");
+    if(!ok)return;
+    leaveCustomRoomToTitle("ルームを解散しました。");
+  }else{
+    leaveCustomRoomToTitle();
+  }
+});
 $("cancelOnlineMatch")?.addEventListener("click",cancelOnlineMatchmaking);
 $("onlineUndo")?.addEventListener("click",onlineUndo);
 $("onlineSubmit")?.addEventListener("click",()=>onlineSubmitAnswer(false));
 
 $("onlineExitButton")?.addEventListener("click",onlineReturnToTitle);
 $("onlineResultBack")?.addEventListener("click",onlineReturnToTitle);
+$("customOptimalGraphButton")?.addEventListener("click",toggleCustomOptimalGraph);
 
 $("backTitle")?.addEventListener("click",returnToTitle);
 // 画面更新で個別リスナーが外れてもタイトルボタンを確実に拾う。
@@ -4562,6 +5417,203 @@ window.firebaseBridge={
     }
     if(typeof renderOnlineRanking==="function"&&selectedGameMode==="rank")renderOnlineRanking();
   },
+  async _customPasswordHash(password){
+    const input=new TextEncoder().encode(String(password||""));
+    const digest=await crypto.subtle.digest("SHA-256",input);
+    return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  },
+  async _customProfile(displayName){
+    const user=await this.requireOnlineLogin();
+    let name=String(accountMenuName?.textContent||displayName||user.displayName||"Player").trim().slice(0,16)||"Player";
+    let rating=Number(String(accountRP?.textContent||"").replace(/[^\d-]/g,""));
+    let rateLabelText=String(accountRate?.textContent||"").trim();
+    if(!Number.isFinite(rating)){
+      const saved=await loadCanonicalRankProfile(user);
+      rating=Math.max(0,Math.round(Number(saved?.rating)||100));
+      name=String(saved?.displayName||name).slice(0,16);
+      rateLabelText=ratingLabel(rating);
+    }
+    return {user,name,rating:Math.max(0,Math.round(rating)),rateLabel:rateLabelText||ratingLabel(rating)};
+  },
+  async listCustomRooms(){
+    await this.requireOnlineLogin();
+    const snapshot=await getDocs(collection(db,"customRooms"));
+    const now=Date.now();
+    const rooms=[];
+
+    for(const roomDoc of snapshot.docs){
+      const room=roomDoc.data();
+      if(room.status!=="waiting")continue;
+
+      const memberSnap=await getDocs(collection(db,"customRooms",roomDoc.id,"members"));
+      const activeMembers=memberSnap.docs
+        .map(d=>d.data())
+        .filter(m=>now-Number(m.lastSeenMs||0)<8000);
+
+      if(activeMembers.length===0)continue;
+      if(activeMembers.length>=Number(room.maxPlayers||8))continue;
+
+      const hostMember=activeMembers.find(m=>
+        m.sessionId===room.hostSessionId && m.isHost
+      );
+
+      // Never advertise an abandoned room after the host disappears.
+      if(!hostMember)continue;
+
+      rooms.push({
+        roomCode:roomDoc.id,
+        maxPlayers:Number(room.maxPlayers||8),
+        memberCount:activeMembers.length,
+        passwordEnabled:Boolean(room.passwordEnabled),
+        hostName:String(hostMember?.name||"Player"),
+        createdAtMs:Number(room.createdAtMs)||0
+      });
+    }
+
+    rooms.sort((a,b)=>b.createdAtMs-a.createdAtMs||a.roomCode.localeCompare(b.roomCode));
+    return rooms.slice(0,30);
+  },
+  async createCustomRoom({displayName,password,maxPlayers}){
+    const {user,name,rating,rateLabel}=await this._customProfile(displayName);
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let roomCode="";
+    for(let attempt=0;attempt<20;attempt++){
+      roomCode=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+      try{
+        const existing=await getDoc(doc(db,"customRooms",roomCode));
+        if(!existing.exists())break;
+      }catch(_){break;}
+    }
+    const sessionId=`cr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
+    const enabled=Boolean(password);
+    const passwordHash=enabled?await this._customPasswordHash(password):"";
+    const roomRef=doc(db,"customRooms",roomCode);
+    await setDoc(roomRef,{
+      roomCode,
+      hostUid:user.uid,
+      hostSessionId:sessionId,
+      status:"waiting",
+      maxPlayers:Math.max(2,Math.min(8,Math.round(Number(maxPlayers)||4))),
+      passwordEnabled:enabled,
+      passwordHash,
+      seed:"",
+      createdAt:serverTimestamp(),
+      createdAtMs:Date.now(),
+      updatedAt:serverTimestamp()
+    });
+    await setDoc(doc(db,"customRooms",roomCode,"members",sessionId),{
+      uid:user.uid,sessionId,name,rating,rateLabel,isHost:true,lastSeenMs:Date.now(),joinedAtMs:Date.now()
+    });
+    const loaded=await this.loadCustomRoom(roomCode);
+    return {roomCode,sessionId,isHost:true,...loaded};
+  },
+  async joinCustomRoom({roomCode,password,displayName}){
+    const {user,name,rating,rateLabel}=await this._customProfile(displayName);
+    roomCode=String(roomCode||"").trim().toUpperCase();
+    const roomRef=doc(db,"customRooms",roomCode);
+    const roomSnap=await getDoc(roomRef);
+    if(!roomSnap.exists())throw new Error("ルームが見つかりません。");
+    const room=roomSnap.data();
+    if(room.status!=="waiting")throw new Error("このルームはすでに対戦中です。");
+    if(room.passwordEnabled){
+      const hash=await this._customPasswordHash(password);
+      if(hash!==room.passwordHash)throw new Error("パスワードが違います。");
+    }
+    const current=await getDocs(collection(db,"customRooms",roomCode,"members"));
+    const active=current.docs.map(d=>d.data()).filter(m=>Date.now()-Number(m.lastSeenMs||0)<8000);
+    if(active.some(m=>m.uid===user.uid))throw new Error("同じGoogleアカウントでは同じルームに重複参加できません。");
+    if(active.length>=Number(room.maxPlayers||8))throw new Error("このルームは満員です。");
+    const sessionId=`cr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
+    await setDoc(doc(db,"customRooms",roomCode,"members",sessionId),{
+      uid:user.uid,sessionId,name,rating,rateLabel,isHost:false,lastSeenMs:Date.now(),joinedAtMs:Date.now()
+    });
+    const loaded=await this.loadCustomRoom(roomCode);
+    return {roomCode,sessionId,isHost:false,...loaded};
+  },
+  async loadCustomRoom(roomCode){
+    const user=await this.requireOnlineLogin();
+    const roomSnap=await getDoc(doc(db,"customRooms",roomCode));
+    if(!roomSnap.exists())return {room:null,members:[]};
+    const memberSnap=await getDocs(collection(db,"customRooms",roomCode,"members"));
+    const now=Date.now();
+    const members=memberSnap.docs.map(d=>d.data())
+      .filter(m=>now-Number(m.lastSeenMs||0)<8000)
+      .sort((a,b)=>Number(b.isHost)-Number(a.isHost)||Number(a.joinedAtMs)-Number(b.joinedAtMs));
+    return {room:roomSnap.data(),members};
+  },
+  async touchCustomRoomMember(roomCode,sessionId){
+    const user=await this.requireOnlineLogin();
+    const ref=doc(db,"customRooms",roomCode,"members",sessionId);
+    const snap=await getDoc(ref);
+    if(!snap.exists()||snap.data().uid!==user.uid)throw new Error("ルーム参加情報がありません。");
+    await setDoc(ref,{lastSeenMs:Date.now()},{merge:true});
+  },
+  async leaveCustomRoom(roomCode,sessionId,isHost){
+    const user=await this.requireOnlineLogin();
+
+    if(isHost){
+      const roomRef=doc(db,"customRooms",roomCode);
+      const snap=await getDoc(roomRef);
+
+      if(
+        snap.exists() &&
+        snap.data().hostUid===user.uid &&
+        snap.data().hostSessionId===sessionId
+      ){
+        await setDoc(roomRef,{
+          status:"closed",
+          closedReason:"host_left",
+          closedAtMs:Date.now(),
+          updatedAt:serverTimestamp()
+        },{merge:true});
+      }
+    }
+
+    try{
+      await deleteDoc(doc(db,"customRooms",roomCode,"members",sessionId));
+    }catch(error){
+      console.warn("custom room member delete failed",error);
+    }
+  },
+  async startCustomRoom(roomCode,sessionId){
+    const user=await this.requireOnlineLogin();
+    const roomRef=doc(db,"customRooms",roomCode);
+    const roomSnap=await getDoc(roomRef);
+    if(!roomSnap.exists())throw new Error("ルームが見つかりません。");
+    const room=roomSnap.data();
+    if(room.hostUid!==user.uid||room.hostSessionId!==sessionId)throw new Error("ホストだけが開始できます。");
+    if(room.status!=="waiting")throw new Error("すでに開始されています。");
+    const members=await getDocs(collection(db,"customRooms",roomCode,"members"));
+    const active=members.docs.map(d=>d.data()).filter(m=>Date.now()-Number(m.lastSeenMs||0)<8000);
+    if(active.length<2)throw new Error("2人以上で開始してください。");
+    await setDoc(roomRef,{
+      status:"playing",
+      seed:`${roomCode}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      startedAt:serverTimestamp(),
+      startedAtMs:Date.now(),
+      playerSessions:active.map(m=>m.sessionId),
+      updatedAt:serverTimestamp()
+    },{merge:true});
+  },
+  async submitCustomRoomResult(roomCode,sessionId,result){
+    const user=await this.requireOnlineLogin();
+    const member=await getDoc(doc(db,"customRooms",roomCode,"members",sessionId));
+    if(!member.exists()||member.data().uid!==user.uid)throw new Error("ルーム参加情報が一致しません。");
+    await setDoc(doc(db,"customRooms",roomCode,"results",sessionId),{
+      uid:user.uid,
+      sessionId,
+      name:String(result.name||member.data().name||"Player").slice(0,16),
+      rounds:Array.isArray(result.rounds)?result.rounds.slice(0,5):[],
+      elapsedMs:Math.min(30000,Math.max(0,Math.round(Number(result.elapsedMs)||0))),
+      timedOut:Boolean(result.timedOut),
+      submittedAt:serverTimestamp()
+    });
+  },
+  async loadCustomRoomResults(roomCode){
+    await this.requireOnlineLogin();
+    const snapshot=await getDocs(collection(db,"customRooms",roomCode,"results"));
+    return snapshot.docs.map(d=>d.data());
+  },
   async joinOnlineQueue(displayName){
     const user=await this.requireOnlineLogin();
 
@@ -4670,9 +5722,10 @@ window.firebaseBridge={
     const pair=waiting.slice(pairStart,pairStart+2);
     if(pair.length<2)return null;
     if(!pair.some(p=>p.uid===user.uid))return null;
+    if(new Set(pair.map(p=>p.uid)).size!==2)return null;
     return {players:pair};
   },
-  async ensureOnlineBattleMatch({matchId,players,names,target,cards}){
+  async ensureOnlineBattleMatch({matchId,players,names,playerSessions,target,cards}){
     const user=await this.requireOnlineLogin();
     if(!players.includes(user.uid))throw new Error("対戦情報が不正です。");
 
@@ -4685,9 +5738,10 @@ window.firebaseBridge={
       await setDoc(ref,{
         players,
         names,
+        playerSessions,
         target:Math.max(1,Math.round(Number(target)||1)),
         cards,
-        presence:Object.fromEntries(players.map(uid=>[uid,Date.now()])),
+        presenceSessions:Object.fromEntries(Object.values(playerSessions||{}).map(sessionId=>[sessionId,Date.now()])),
         createdAt:serverTimestamp(),
         createdAtMs:Date.now(),
         updatedAt:serverTimestamp()
@@ -4739,15 +5793,18 @@ window.firebaseBridge={
       throw new Error("回答結果の保存に失敗しました。Firestoreルールを確認してください。");
     }
   },
-  async touchOnlineBattlePresence(matchId){
+  async touchOnlineBattlePresence(matchId,sessionId){
     const user=await this.requireOnlineLogin();
     const matchRef=doc(db,"onlineMatches",matchId);
     const snap=await getDoc(matchRef);
     if(!snap.exists()||!Array.isArray(snap.data().players)||!snap.data().players.includes(user.uid)){
       throw new Error("対戦ルームが見つかりません。");
     }
+    if(!sessionId || snap.data().playerSessions?.[user.uid]!==sessionId){
+      throw new Error("この対戦セッションは無効です。");
+    }
     await updateDoc(matchRef,{
-      [`presence.${user.uid}`]:Date.now(),
+      [`presenceSessions.${sessionId}`]:Date.now(),
       updatedAt:serverTimestamp()
     });
   },
@@ -4759,18 +5816,29 @@ window.firebaseBridge={
     }
     return snap.data();
   },
-  async recordOnlineForfeit(matchId,loserUid){
+  async recordOnlineForfeit(matchId,loserUid,loserSessionId,winnerSessionId){
     const user=await this.requireOnlineLogin();
     const ref=doc(db,"onlineMatches",matchId);
     const snap=await getDoc(ref);
     if(!snap.exists()||!snap.data().players.includes(user.uid)||!snap.data().players.includes(loserUid)){
       throw new Error("対戦ルームが見つかりません。");
     }
+
     const current=snap.data();
+    if(current.playerSessions?.[user.uid]!==winnerSessionId){
+      throw new Error("勝者側の対戦セッションが一致しません。");
+    }
+    if(current.playerSessions?.[loserUid]!==loserSessionId){
+      throw new Error("相手側の対戦セッションが一致しません。");
+    }
+
     if(current.forfeit?.loserUid)return current.forfeit;
+
     const forfeit={
       loserUid,
+      loserSessionId,
       winnerUid:user.uid,
+      winnerSessionId,
       decidedAtMs:Date.now(),
       reason:"disconnect"
     };
@@ -5350,6 +6418,182 @@ window.firebaseBridge={
 #onlineCards .cardbtn{
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
+}
+</style>
+
+
+<style id="custom-room-v37">
+.custom-room-panel,.custom-room-lobby{
+  margin:12px 0;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:rgba(13,23,39,.55);
+}
+.custom-room-choice-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+.custom-room-area h3,.custom-room-lobby h3{margin:0 0 10px}
+.custom-field{display:grid;gap:5px;margin:9px 0;font-size:12px;color:var(--muted)}
+.custom-field input,.custom-field select{
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:9px 10px;
+  background:#0b1422;
+  color:var(--text);
+  font-size:14px;
+}
+.custom-check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}
+.custom-room-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.custom-room-lobby-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.custom-room-lobby-head small{color:var(--muted)}
+.custom-room-badge{padding:4px 8px;border:1px solid var(--border);border-radius:999px;font-size:11px}
+.custom-room-members{display:grid;gap:7px;margin:12px 0}
+.custom-room-member{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:#0b1422
+}
+.custom-room-member div{display:grid;gap:2px;min-width:0}
+.custom-room-member small{font-size:9px;color:var(--muted)}
+.custom-room-member strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.custom-room-member span{font-size:10px;color:var(--muted)}
+.custom-room-member b{font-size:10px;color:#9fc0ff}
+.custom-room-error{color:#ff9d9d!important}
+.custom-multi-result{margin-top:12px}
+.custom-multi-ranking{display:grid;gap:6px}
+.custom-ranking-row{
+  display:grid;grid-template-columns:34px minmax(0,1fr) 70px 58px;
+  gap:8px;align-items:center;padding:9px 10px;border:1px solid var(--border);border-radius:10px
+}
+.custom-ranking-row.you{outline:1px solid #7ca7ff}
+.custom-ranking-row.winner{border-color:#64cf86}
+.custom-rank-place{font-size:18px;font-weight:900;text-align:center}
+.custom-ranking-row div{display:grid;gap:2px;min-width:0}
+.custom-ranking-row div strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.custom-ranking-row small{color:var(--muted);font-size:9px}
+.custom-ranking-row>b{text-align:right}
+.custom-ranking-row>span:last-child{text-align:right;color:var(--muted);font-size:11px}
+@media(max-width:600px){
+  .custom-room-choice-grid{grid-template-columns:1fr}
+  .custom-ranking-row{grid-template-columns:28px minmax(0,1fr) 58px 48px;padding:8px 6px;gap:5px}
+}
+</style>
+
+
+<style id="custom-room-list-v39">
+.custom-room-browser-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:4px 0 8px;
+}
+.custom-room-list{
+  display:grid;
+  gap:7px;
+  margin-bottom:14px;
+}
+.custom-room-list-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#0b1422;
+}
+.custom-room-list-info{
+  display:grid;
+  gap:2px;
+  min-width:0;
+}
+.custom-room-list-info strong{
+  font-size:13px;
+}
+.custom-room-list-info span{
+  font-size:11px;
+  color:var(--text);
+}
+.custom-room-list-info small{
+  font-size:10px;
+  color:var(--muted);
+}
+.custom-room-manual-join{
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid var(--border);
+}
+.custom-room-manual-join>small{
+  color:var(--muted);
+  font-weight:800;
+}
+@media(max-width:600px){
+  .custom-room-list-row{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .custom-room-list-row>.action{
+    width:100%;
+  }
+}
+</style>
+
+
+<style id="custom-room-list-only-v40">
+.custom-room-list-button{
+  width:100%;
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+  appearance:none;
+  -webkit-appearance:none;
+}
+.custom-room-list-button:hover{
+  border-color:#5d79a6;
+  background:#101d31;
+}
+.custom-room-list-lock{
+  flex:0 0 auto;
+  font-size:10px;
+  letter-spacing:.04em;
+  color:#9fc0ff;
+}
+.custom-password-join-panel{
+  margin:12px 0;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:#0b1422;
+}
+.custom-password-join-panel>div:first-child{
+  display:grid;
+  gap:2px;
+}
+.custom-password-join-panel small{
+  color:var(--muted);
+  font-size:9px;
+  letter-spacing:.1em;
+}
+.custom-password-join-panel strong{
+  font-size:14px;
+}
+</style>
+
+
+<style id="custom-optimal-graph-button-v42">
+.custom-graph-actions{
+  display:flex;
+  justify-content:center;
+  margin-top:12px;
+}
+#customOptimalGraphButton{
+  min-width:180px;
 }
 </style>
 
