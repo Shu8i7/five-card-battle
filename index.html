@@ -1504,7 +1504,7 @@ button.warn{background:#4a3918;border-color:#886e31}
     <div class="actions">
       <button id="nextRound" class="action primary" disabled>次のラウンド</button>
       <button id="restart" class="action">最初から</button>
-      <button id="backTitle" class="action">タイトルへ</button>
+      <button id="backTitle" class="action">メニューに戻る</button>
     </div>
       </div>
       <aside class="history-panel">
@@ -1594,7 +1594,7 @@ button.warn{background:#4a3918;border-color:#886e31}
           <small>ONLINE BATTLE</small>
           <h1>1 VS 1</h1>
         </div>
-        <button id="onlineExitButton" class="action" type="button">タイトルへ</button>
+        <button id="onlineExitButton" class="action" type="button">対戦を終了してメニューへ</button>
       </div>
 
       <div class="online-versus">
@@ -1668,7 +1668,7 @@ button.warn{background:#4a3918;border-color:#886e31}
           </div>
         </div>
         <p id="onlineResultReason" class="help"></p>
-        <button id="onlineResultBack" class="action primary" type="button">タイトルへ戻る</button>
+        <button id="onlineResultBack" class="action primary" type="button">メニューに戻る</button>
       </section>
     </div>
   </section>
@@ -3097,6 +3097,7 @@ async function refreshCustomRoomList(){
           $("customPasswordRoomLabel").textContent=`ROOM ${room.roomCode}`;
           $("customPasswordJoinPanel").classList.remove("hidden");
           $("customListPassword").value="";
+          $("customListPassword").classList.remove("custom-password-input-error");
           $("customListPassword").focus();
           customShowSetupMessage("このルームはパスワードが設定されています。");
           return;
@@ -3132,7 +3133,18 @@ async function joinListedCustomRoom(roomCode,password){
     $("customPasswordJoinPanel")?.classList.add("hidden");
     await enterCustomRoomLobby(data);
   }catch(error){
-    customShowSetupMessage(error?.message||"ルームに参加できませんでした。",true);
+    const message=error?.message||"ルームに参加できませんでした。";
+    customShowSetupMessage(message,true);
+
+    if(message.includes("パスワードが違います")){
+      const input=$("customListPassword");
+      input?.classList.add("custom-password-input-error");
+      if(input){
+        input.value="";
+        input.focus();
+      }
+      alert("パスワードが違います。正しいパスワードを入力してください。");
+    }
   }
 }
 
@@ -5024,6 +5036,11 @@ $("customListPasswordCancelButton")?.addEventListener("click",()=>{
   customRoomState.selectedJoinRoomCode="";
   $("customPasswordJoinPanel")?.classList.add("hidden");
   $("customListPassword").value="";
+  $("customListPassword").classList.remove("custom-password-input-error");
+  customShowSetupMessage("");
+});
+$("customListPassword")?.addEventListener("input",event=>{
+  event.target.classList.remove("custom-password-input-error");
   customShowSetupMessage("");
 });
 $("customListPassword")?.addEventListener("keydown",event=>{
@@ -6594,6 +6611,14 @@ window.firebaseBridge={
 }
 #customOptimalGraphButton{
   min-width:180px;
+}
+</style>
+
+
+<style id="password-warning-v44">
+.custom-password-input-error{
+  border-color:#ef5555!important;
+  outline:2px solid rgba(239,85,85,.2);
 }
 </style>
 
