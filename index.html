@@ -879,8 +879,9 @@ h2{font-size:17px;letter-spacing:.01em}
 #startButton{
   min-height:54px;border-radius:9px!important;border:1px solid #9aa5ff!important;
   background:linear-gradient(180deg,#8592ff,#6676e9)!important;
-  box-shadow:0 10px 28px rgba(89,105,223,.26);font-size:17px!important
+  box-shadow:0 10px 28px rgba(89,105,223,.26);font-size:17px!important;color:#fff!important
 }
+#startButton span{color:#fff!important}
 #startButton:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .rank-guide{border-radius:11px!important;background:#0d131e!important;border-color:#263247!important}
 .rank-guide-grid span{border-radius:6px!important;background:#151d2b!important}
@@ -1023,6 +1024,31 @@ button.warn{background:#4a3918;border-color:#886e31}
   100%{transform:scale(1)}
 }
 
+.auth-panel{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:10px;background:#111827}
+.auth-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.auth-status{flex:1;min-width:200px;color:var(--muted);font-size:13px}
+.auth-status strong{color:var(--text)}
+.google-account-button{width:42px;height:42px;padding:0;border:2px solid #5d6f93;border-radius:50%;background:#0d1423;overflow:hidden;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.google-account-button:hover{transform:scale(1.06);border-color:#8ea7d8;box-shadow:0 0 0 3px rgba(112,143,205,.2)}
+.google-account-button:focus-visible{outline:3px solid #8cb4ff;outline-offset:3px}
+.google-account-icon{display:block;width:100%;height:100%;object-fit:cover;background:#25324b}
+.google-account-menu{position:absolute;z-index:1200;top:calc(100% + 10px);right:0;width:min(330px,calc(100vw - 32px));padding:16px;border:1px solid #65769a;border-radius:22px;background:#e9eef8;color:#172033;box-shadow:0 22px 55px rgba(0,0,0,.38)}
+.google-account-menu.hidden{display:none!important}
+.google-account-menu-head{display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 8px 14px}
+.google-account-menu-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#c9d5ea;border:3px solid #fff;box-shadow:0 2px 8px rgba(20,35,60,.22)}
+.google-account-menu-name{font-size:20px;font-weight:900;text-align:center}
+.google-account-menu-email{font-size:12px;color:#56627a;overflow-wrap:anywhere;text-align:center}
+.google-account-menu-action{display:block;width:100%;margin-top:8px;padding:12px 14px;border:1px solid #aab7ce;border-radius:14px;background:#fff;color:#172033;font-weight:800;text-align:left;cursor:pointer}
+.google-account-menu-action:hover{background:#f6f8fc}
+.google-account-menu-action.primary{color:#075ac8;text-align:center;border-color:#7f8da6;border-radius:999px}
+.google-account-menu-action.danger{color:#a62929}
+.auth-row{position:relative}
+.auth-button{border:1px solid #4a5875!important;background:#f7f7f7!important;color:#172033!important;padding:9px 13px!important;border-radius:8px!important;font-weight:800!important;cursor:pointer}
+.auth-button.secondary{background:#182238!important;color:#eaf0ff!important}
+.auth-note{margin:8px 0 0;color:#9ba8bd;font-size:11px;line-height:1.45}
+.auth-error{color:#ff9898!important}
+.mode-login-note{display:block;margin-top:4px;color:#ffd86b;font-size:11px}
+
 </style>
 </head>
 <body>
@@ -1043,12 +1069,12 @@ button.warn{background:#4a3918;border-color:#886e31}
   <h2>ゲームモード</h2>
   <button id="soloModeButton" class="mode-card selected" type="button">
     <span class="mode-title">Solo Play</span>
-    <span class="mode-desc">ランク変動なしで、自由に最高記録へ挑戦する</span>
+    <span class="mode-desc">ログイン不要。データを保存せず、自由に最高記録へ挑戦する</span>
     <span class="mode-status">通常</span>
   </button>
   <button id="rankModeButton" class="mode-card" type="button">
     <span class="mode-title">Solo Rank Play</span>
-    <span class="mode-desc">現在ランクの平均記録を基準に、ランクポイントが上下する</span>
+    <span class="mode-desc">Googleログイン必須。RPと名前をアカウントごとに保存する</span>
     <span class="mode-status">RP戦</span>
   </button>
   <button class="mode-card locked" type="button" disabled>
@@ -1062,6 +1088,27 @@ button.warn{background:#4a3918;border-color:#886e31}
   <label for="playerName">プレイヤー名</label>
   <input id="playerName" maxlength="16" autocomplete="nickname" placeholder="名前を入力">
   <p id="nameError" class="hidden name-error">プレイヤー名を入力してください。</p>
+  <div class="auth-panel">
+    <div class="auth-row">
+      <div id="authStatus" class="auth-status">未ログイン</div>
+      <button id="googleAccountButton" class="google-account-button hidden" type="button" aria-label="Googleアカウントメニュー" title="Googleアカウントメニュー" aria-expanded="false">
+        <img id="googleAccountIcon" class="google-account-icon" alt="" referrerpolicy="no-referrer">
+      </button>
+      <div id="googleAccountMenu" class="google-account-menu hidden" role="dialog" aria-label="Googleアカウントメニュー">
+        <div class="google-account-menu-head">
+          <img id="googleAccountMenuAvatar" class="google-account-menu-avatar" alt="" referrerpolicy="no-referrer">
+          <div id="googleAccountMenuName" class="google-account-menu-name"></div>
+          <div id="googleAccountMenuEmail" class="google-account-menu-email"></div>
+        </div>
+        <button id="manageGoogleAccountButton" class="google-account-menu-action primary" type="button">Googleアカウントを管理</button>
+        <button id="switchGoogleAccountButton" class="google-account-menu-action" type="button">別のGoogleアカウントでログイン</button>
+        <button id="menuGoogleLogoutButton" class="google-account-menu-action danger" type="button">ゲームからログアウト</button>
+      </div>
+      <button id="googleLoginButton" class="auth-button" type="button">Googleでログイン</button>
+      <button id="googleLogoutButton" class="auth-button secondary hidden" type="button">ログアウト</button>
+    </div>
+    <p id="authNote" class="auth-note">Solo Playはログイン不要で、プレイデータは保存されません。Solo RankはGoogleログインが必要です。</p>
+  </div>
   <button id="startButton" type="button"><span id="startButtonText">Solo Playを開始</span></button>
 
 <section class="rank-guide">
@@ -1180,7 +1227,11 @@ button.warn{background:#4a3918;border-color:#886e31}
           <div id="operatorProbability" class="operator-probability"></div>
         </section>
         <section class="ranking-section">
-          <h2>ランキング</h2>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <h2 id="rankingHeading" style="margin:0">ランキング</h2>
+            <button id="refreshRanking" class="action" type="button" style="padding:5px 9px;font-size:12px">更新</button>
+          </div>
+          <p id="rankingNote" class="operator-prob-note">Solo Playの端末内記録</p>
           <div id="rankingList" class="ranking-list">
             <p class="history-empty">まだ記録はありません。</p>
           </div>
@@ -1398,7 +1449,7 @@ function updateRankRating(){
   const beforeRating=Math.max(0,state.rankRating);
   state.rankRating=Math.max(0,beforeRating+requestedDelta);
   const delta=state.rankRating-beforeRating;
-  try{localStorage.setItem("fiveCardSoloRankRating",String(state.rankRating));}catch(_){}
+  saveRankRating();
   state.lastRankDelta=delta;
   return {delta,cleared,expected:band.avg};
 }
@@ -1439,7 +1490,7 @@ function openRankMeter(){renderRankMeter();$("rankMeterModal").classList.remove(
 function closeRankMeter(){$("rankMeterModal").classList.add("hidden");}
 
 const state={
-  round:1,target:10,hp:100,maxHp:100,baseTime:30,playerName:"",rankRating:1000,sessionStartRating:1000,rankAdjusted:false,lastRankDelta:0,rarityLuck:0,perfectBonusRate:10,extraRewardPending:false,rewardQueue:[],
+  round:1,target:10,hp:100,maxHp:100,baseTime:30,playerName:"",rankRating:100,sessionStartRating:100,rankAdjusted:false,lastRankDelta:0,rarityLuck:0,perfectBonusRate:10,extraRewardPending:false,rewardQueue:[],
   timeLeft:30,timeLimit:30,rerollsLeft:3,maxRerolls:3,
   cards:[],chosen:[],roundResolved:false,gameOver:false,timerId:null,
   specialCards:[],pendingReward:null,timeoutTick:0,history:[],ranking:[],
@@ -1490,24 +1541,64 @@ function makeHand(){
   state.chosen=[];
 }
 
-function startGame(){
-  const enteredName=$("playerName").value.trim();
+async function getSavedRankRating(){
+  if(selectedGameMode!=="rank")return 100;
+  if(!window.firebaseBridge)throw new Error("Firebaseの読み込みが完了していません。");
+  const profile=await window.firebaseBridge.loadRankProfile();
+  const parsedRating=Number(profile?.rating);
+  return Number.isFinite(parsedRating)?Math.max(0,Math.round(parsedRating)):100;
+}
+
+async function startGame(){
   const nameError=$("nameError");
+
+  if(selectedGameMode==="rank"){
+    if(!window.firebaseBridge){
+      alert("Googleログイン機能の読み込みが完了していません。少し待ってからもう一度お試しください。");
+      return;
+    }
+    try{
+      const user=await window.firebaseBridge.requireRankLogin();
+      if(!$("playerName").value.trim() && user?.displayName){
+        $("playerName").value=user.displayName.slice(0,16);
+      }
+    }catch(error){
+      alert(error?.message||"Googleログインが必要です。");
+      return;
+    }
+  }
+
+  const enteredName=$("playerName").value.trim();
   if(!enteredName){
     if(nameError)nameError.classList.remove("hidden");
     $("playerName").focus();
     return;
   }
   if(nameError)nameError.classList.add("hidden");
+
+  let startingRating=100;
+  if(selectedGameMode==="rank"){
+    try{
+      startingRating=await getSavedRankRating();
+    }catch(error){
+      alert(error?.message||"ランクデータの読み込みに失敗しました。");
+      return;
+    }
+    const accepted=window.confirm(
+      `SOLO RANK PLAYを開始します。\n\n今回の開始レート：${startingRating} RP\nGoogleアカウントに結果が保存されます。\nゲーム終了時の成績によってレートが増減します。\n\n開始しますか？`
+    );
+    if(!accepted)return;
+    try{
+      await window.firebaseBridge.saveRankProfile({rating:startingRating,displayName:enteredName});
+    }catch(error){
+      alert(error?.message||"ランクデータの保存準備に失敗しました。");
+      return;
+    }
+  }
+
   playSound("start");
   state.playerName=enteredName;
-  try{
-    const savedRating=localStorage.getItem("fiveCardSoloRankRating");
-    const parsedRating=savedRating===null?1000:Number(savedRating);
-    state.rankRating=Number.isFinite(parsedRating)?Math.max(0,parsedRating):1000;
-  }catch(_){
-    state.rankRating=1000;
-  }
+  state.rankRating=startingRating;
   state.sessionStartRating=state.rankRating;
   state.rankAdjusted=false;
   state.lastRankDelta=0;
@@ -1747,7 +1838,15 @@ function findRankedExpressions(){
 
 function saveRankRating(){
   state.rankRating=Math.max(0,Math.round(state.rankRating));
-  try{localStorage.setItem("fiveCardSoloRankRating",String(state.rankRating));}catch(_){}
+  if(selectedGameMode!=="rank")return;
+  if(!window.firebaseBridge)return;
+  window.firebaseBridge.saveRankProfile({
+    rating:state.rankRating,
+    displayName:state.playerName
+  }).catch(error=>{
+    console.error("ランクデータ保存エラー:",error);
+    show("ランクデータの保存に失敗しました。通信状態を確認してください。","bad");
+  });
 }
 
 let efficiencyOverlayTimer=null;
@@ -2022,8 +2121,46 @@ function renderOperatorProbability(){
   });
 }
 
-function renderRanking(){
+async function renderOnlineRanking(){
   const box=$("rankingList");
+  const heading=$("rankingHeading");
+  const note=$("rankingNote");
+  if(!box)return;
+  heading.textContent="オンラインRPランキング";
+  note.textContent="GoogleアカウントのSolo Rank上位10人";
+  box.innerHTML='<p class="history-empty">ランキングを読み込み中...</p>';
+  try{
+    if(!window.firebaseBridge)throw new Error("Firebaseの読み込みが完了していません。");
+    const entries=await window.firebaseBridge.loadLeaderboard(10);
+    box.innerHTML="";
+    if(!entries.length){
+      box.innerHTML='<p class="history-empty">まだオンライン記録がありません。</p>';
+      return;
+    }
+    const currentUid=window.firebaseBridge.getUser()?.uid||"";
+    entries.forEach((entry,index)=>{
+      const row=document.createElement("div");
+      row.className="ranking-row"+(entry.uid===currentUid?" current":"");
+      row.innerHTML=`
+        <span class="rank-number">${index+1}</span>
+        <span class="rank-name">${escapeHtml(entry.displayName||"Player")}</span>
+        <span class="rank-score">
+          <strong>${Math.max(0,Math.round(Number(entry.rating)||0))} RP</strong>
+          <small>${entry.uid===currentUid?"あなた":"ONLINE"}</small>
+        </span>`;
+      box.appendChild(row);
+    });
+  }catch(error){
+    console.error("オンラインランキング取得エラー:",error);
+    box.innerHTML=`<p class="history-empty">ランキングを取得できませんでした。<br>${escapeHtml(error?.message||"")}</p>`;
+  }
+}
+
+function renderRanking(){
+  if(selectedGameMode==="rank"){renderOnlineRanking();return;}
+  const box=$("rankingList");
+  $("rankingHeading").textContent="ランキング";
+  $("rankingNote").textContent="Solo Playの端末内記録";
   box.innerHTML="";
   if(state.ranking.length===0){
     box.innerHTML='<p class="history-empty">まだ記録はありません。</p>';
@@ -2394,15 +2531,59 @@ if(soundToggle){
 
 const soloModeButton=$("soloModeButton");
 const rankModeButton=$("rankModeButton");
+const googleLoginButton=$("googleLoginButton");
+const googleLogoutButton=$("googleLogoutButton");
+const googleAccountButton=$("googleAccountButton");
+const googleAccountMenu=$("googleAccountMenu");
+const manageGoogleAccountButton=$("manageGoogleAccountButton");
+const switchGoogleAccountButton=$("switchGoogleAccountButton");
+const menuGoogleLogoutButton=$("menuGoogleLogoutButton");
+
+function closeGoogleAccountMenu(){
+  googleAccountMenu?.classList.add("hidden");
+  googleAccountButton?.setAttribute("aria-expanded","false");
+}
+googleAccountButton?.addEventListener("click",event=>{
+  event.stopPropagation();
+  const willOpen=googleAccountMenu?.classList.contains("hidden");
+  googleAccountMenu?.classList.toggle("hidden");
+  googleAccountButton.setAttribute("aria-expanded",String(Boolean(willOpen)));
+});
+manageGoogleAccountButton?.addEventListener("click",()=>{
+  window.location.href="https://myaccount.google.com/";
+});
+switchGoogleAccountButton?.addEventListener("click",async()=>{
+  closeGoogleAccountMenu();
+  try{await window.firebaseBridge?.signIn(true);}
+  catch(error){alert(error?.message||"Googleアカウントの切り替えに失敗しました。");}
+});
+menuGoogleLogoutButton?.addEventListener("click",async()=>{
+  closeGoogleAccountMenu();
+  try{await window.firebaseBridge?.signOut();}
+  catch(error){alert(error?.message||"ログアウトに失敗しました。");}
+});
+document.addEventListener("click",event=>{
+  if(!googleAccountMenu?.contains(event.target)&&!googleAccountButton?.contains(event.target))closeGoogleAccountMenu();
+});
+googleLoginButton?.addEventListener("click",async()=>{
+  try{await window.firebaseBridge?.signIn();}
+  catch(error){alert(error?.message||"Googleログインに失敗しました。");}
+});
+googleLogoutButton?.addEventListener("click",async()=>{
+  try{await window.firebaseBridge?.signOut();}
+  catch(error){alert(error?.message||"ログアウトに失敗しました。");}
+});
 function selectMode(mode){
   selectedGameMode=mode;
   soloModeButton.classList.toggle("selected",mode==="solo");
   rankModeButton.classList.toggle("selected",mode==="rank");
   $("startButtonText").textContent=mode==="rank"?"Solo Rank Playを開始":"Solo Playを開始";
+  renderRanking();
   playSound("select");
 }
 soloModeButton.addEventListener("click",()=>selectMode("solo"));
 rankModeButton.addEventListener("click",()=>selectMode("rank"));
+$("refreshRanking")?.addEventListener("click",()=>renderRanking());
 
 $("startButton").addEventListener("click",startGame);
 
@@ -2516,5 +2697,163 @@ Epic: strong build-around effects (combo, cooldown reduction, duplicate reward)
 Legendary: game-changing but conditional (once per battle revive, perfect streak bonus, unique mechanics)
 Never grant permanent rarity multipliers.
 -->
+
+<script type="module">
+import { firebaseConfig } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+const statusEl=document.getElementById("authStatus");
+const accountButton=document.getElementById("googleAccountButton");
+const accountIcon=document.getElementById("googleAccountIcon");
+const accountMenuAvatar=document.getElementById("googleAccountMenuAvatar");
+const accountMenuName=document.getElementById("googleAccountMenuName");
+const accountMenuEmail=document.getElementById("googleAccountMenuEmail");
+const loginButton=document.getElementById("googleLoginButton");
+const logoutButton=document.getElementById("googleLogoutButton");
+const authNote=document.getElementById("authNote");
+const configured=Boolean(firebaseConfig?.apiKey && !String(firebaseConfig.apiKey).includes("ここに"));
+let auth=null;
+let db=null;
+let currentUser=null;
+
+function updateAuthUI(user){
+  currentUser=user||null;
+  if(!configured){
+    statusEl.textContent='Firebase未設定';
+    statusEl.classList.add("auth-error");
+    accountButton.classList.add("hidden");
+    loginButton.disabled=true;
+    authNote.textContent="firebase-config.jsを設定するとGoogleログインが使用できます。";
+    return;
+  }
+  statusEl.classList.remove("auth-error");
+  if(user){
+    statusEl.textContent='ログイン中';
+    const fallbackIcon='data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#35476b"/><circle cx="32" cy="24" r="12" fill="#eaf0ff"/><path d="M12 58c2-14 10-21 20-21s18 7 20 21" fill="#eaf0ff"/></svg>');
+    const resolvedIcon=user.photoURL||fallbackIcon;
+    accountIcon.src=resolvedIcon;
+    accountMenuAvatar.src=resolvedIcon;
+    accountIcon.onerror=()=>{accountIcon.onerror=null;accountIcon.src=fallbackIcon;};
+    accountMenuAvatar.onerror=()=>{accountMenuAvatar.onerror=null;accountMenuAvatar.src=fallbackIcon;};
+    accountMenuName.textContent=user.displayName||"Googleユーザー";
+    accountMenuEmail.textContent=user.email||"";
+    accountButton.classList.remove("hidden");
+    loginButton.classList.add("hidden");
+    logoutButton.classList.remove("hidden");
+  }else{
+    statusEl.textContent='未ログイン';
+    accountIcon.removeAttribute("src");
+    accountMenuAvatar.removeAttribute("src");
+    accountMenuName.textContent="";
+    accountMenuEmail.textContent="";
+    document.getElementById("googleAccountMenu")?.classList.add("hidden");
+    accountButton.setAttribute("aria-expanded","false");
+    accountButton.classList.add("hidden");
+    loginButton.classList.remove("hidden");
+    logoutButton.classList.add("hidden");
+  }
+}
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+
+async function ensureProfileDocument(user){
+  if(!db||!user)return null;
+  const ref=doc(db,"users",user.uid);
+  const snapshot=await getDoc(ref);
+  if(snapshot.exists())return snapshot.data();
+  const initial={
+    rating:100,
+    displayName:user.displayName||"Player",
+    email:user.email||"",
+    photoURL:user.photoURL||"",
+    createdAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+  await setDoc(ref,initial);
+  await setDoc(doc(db,"leaderboard",user.uid),{
+    uid:user.uid,
+    rating:100,
+    displayName:String(user.displayName||"Player").slice(0,16),
+    updatedAt:serverTimestamp()
+  });
+  return initial;
+}
+
+if(configured){
+  const app=initializeApp(firebaseConfig);
+  auth=getAuth(app);
+  db=getFirestore(app);
+  onAuthStateChanged(auth,async user=>{
+    currentUser=user||null;
+    updateAuthUI(user);
+    if(user){
+      try{await ensureProfileDocument(user);}
+      catch(error){
+        console.error("ユーザーデータの初期作成に失敗しました",error);
+        statusEl.textContent="ログイン済み（保存エラー）";
+        statusEl.classList.add("auth-error");
+      }
+    }
+  });
+}else updateAuthUI(null);
+
+window.firebaseBridge={
+  isConfigured:()=>configured,
+  getUser:()=>currentUser,
+  async signIn(forceAccountSelection=false){
+    if(!configured)throw new Error("Firebaseが未設定です。firebase-config.jsを設定してください。");
+    const provider=new GoogleAuthProvider();
+    if(forceAccountSelection)provider.setCustomParameters({prompt:"select_account"});
+    const result=await signInWithPopup(auth,provider);
+    currentUser=result.user;
+    updateAuthUI(currentUser);
+    await ensureProfileDocument(currentUser);
+    return currentUser;
+  },
+  async signOut(){
+    if(auth)await firebaseSignOut(auth);
+    currentUser=null;
+    updateAuthUI(null);
+  },
+  async requireRankLogin(){
+    if(!configured)throw new Error("Firebaseが未設定のためSolo Rankを開始できません。");
+    if(currentUser)return currentUser;
+    return this.signIn();
+  },
+  async loadRankProfile(){
+    const user=await this.requireRankLogin();
+    return await ensureProfileDocument(user);
+  },
+  async saveRankProfile({rating,displayName}){
+    const user=await this.requireRankLogin();
+    const safeRating=Math.max(0,Math.round(Number(rating)||100));
+    const safeName=String(displayName||user.displayName||"Player").slice(0,16);
+    await Promise.all([
+      setDoc(doc(db,"users",user.uid),{
+        rating:safeRating,
+        displayName:safeName,
+        updatedAt:serverTimestamp()
+      },{merge:true}),
+      setDoc(doc(db,"leaderboard",user.uid),{
+        uid:user.uid,
+        rating:safeRating,
+        displayName:safeName,
+        updatedAt:serverTimestamp()
+      },{merge:true})
+    ]);
+    if(typeof renderOnlineRanking==="function"&&selectedGameMode==="rank")renderOnlineRanking();
+  },
+  async loadLeaderboard(maxEntries=10){
+    if(!db)throw new Error("Firestoreが利用できません。");
+    const rankingQuery=query(collection(db,"leaderboard"),orderBy("rating","desc"),limit(Math.max(1,Math.min(100,Number(maxEntries)||10))));
+    const snapshot=await getDocs(rankingQuery);
+    return snapshot.docs.map(item=>({uid:item.id,...item.data()}));
+  }
+};
+</script>
+
 </body>
 </html>
