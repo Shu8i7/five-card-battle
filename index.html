@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>5枚カード式バトル</title>
+<title>5枚の数字と演算子を組み合わせ、目標値を超えろ。特殊カードを集めて、限界まで勝ち続けよう。</title>
 <style>
 :root{
   --bg:#0f1220;--panel:#181d31;--card:#222945;--text:#f7f8ff;
@@ -1010,18 +1010,23 @@ button.warn{background:#4a3918;border-color:#886e31}
 .special-modal.perfect-bonus-modal .special-modal-card>h2{color:#ffe69a;letter-spacing:.06em}
 .special-reward.perfect-bonus-reward{
   position:relative;border-width:2px!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 0 24px rgba(255,214,107,.2);
-  animation:perfectBonusReveal .5s ease-out
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 0 24px rgba(255,214,107,.2)
 }
 .special-reward.perfect-bonus-reward::before{
   content:"BONUS CARD";position:absolute;top:8px;right:9px;
   padding:3px 6px;border:1px solid rgba(255,214,107,.7);
-  background:#2b2412;color:#ffe08a;font-size:9px;font-weight:950;letter-spacing:.12em
+  background:#2b2412;color:#ffe08a;font-size:9px;font-weight:950;letter-spacing:.12em;
+  pointer-events:none
+}
+/* 追加カードの登場演出は外側のモーダルへ。
+   r9/r10などカード固有animationとは別レイヤーなので競合しない。 */
+.special-modal.perfect-bonus-modal:not(.hidden) .special-modal-card{
+  animation:perfectBonusReveal .5s ease-out
 }
 @keyframes perfectBonusReveal{
   0%{transform:scale(.94);opacity:.35}
   65%{transform:scale(1.025);opacity:1}
-  100%{transform:scale(1)}
+  100%{transform:scale(1);opacity:1}
 }
 
 .auth-panel{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:10px;background:#111827}
@@ -1042,12 +1047,218 @@ button.warn{background:#4a3918;border-color:#886e31}
 .google-account-menu-action:hover{background:#f6f8fc}
 .google-account-menu-action.primary{color:#075ac8;text-align:center;border-color:#7f8da6;border-radius:999px}
 .google-account-menu-action.danger{color:#a62929}
+.google-account-stats{
+  margin:2px 0 12px;padding:10px 12px;border:1px solid #d3dbea;border-radius:14px;background:#f5f7fb
+}
+.google-account-stats>div{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:5px 0}
+.google-account-stats span{font-size:12px;color:#69758b}
+.google-account-stats strong{font-size:13px;color:#172033}
+#googleAccountRank{white-space:nowrap;font-size:12px}
+@media(max-width:600px){
+  #googleAccountRank{font-size:12px}
+}
+
+.google-account-stats .hidden{display:none!important}
+/* 管理ボタンも他の通常ボタンと同じ見た目に統一 */
+#manageGoogleAccountButton{
+  background:#fff!important;color:#172033!important;border:1px solid #aab7ce!important;
+  border-radius:14px!important;text-align:left!important
+}
+#manageGoogleAccountButton:hover{background:#f6f8fc!important}
+
 .auth-row{position:relative}
 .auth-button{border:1px solid #4a5875!important;background:#f7f7f7!important;color:#172033!important;padding:9px 13px!important;border-radius:8px!important;font-weight:800!important;cursor:pointer}
 .auth-button.secondary{background:#182238!important;color:#eaf0ff!important}
 .auth-note{margin:8px 0 0;color:#9ba8bd;font-size:11px;line-height:1.45}
 .auth-error{color:#ff9898!important}
 .mode-login-note{display:block;margin-top:4px;color:#ffd86b;font-size:11px}
+
+
+
+/* ===== Mobile battle cockpit v1 =====
+   Keep the actual battle controls inside the first phone viewport.
+   Desktop/tablet layout is intentionally unchanged. */
+@media (max-width:600px){
+  body{overflow-x:hidden}
+  main{width:100%;margin:0;padding:0 7px 18px}
+  #gameScreen>h1{display:none}
+  #gameScreen .game-main{min-width:0}
+
+  /* Non-essential side information stays below the battle area. */
+  .history-panel{margin-top:10px}
+  .history-panel .operator-prob-section,
+  .history-panel .ranking-section,
+  .history-panel .history-section{padding-top:0}
+
+  /* Compact mode/rank/bonus header. */
+  .current-mode-banner{
+    min-height:0!important;margin:5px 0 4px!important;padding:4px 8px!important;
+    display:flex!important;align-items:center;justify-content:space-between;gap:8px
+  }
+  .current-mode-banner small{font-size:8px!important}
+  .current-mode-banner strong{font-size:11px!important}
+  .current-rank{margin:0 0 4px!important;padding:5px 8px!important;font-size:11px!important}
+  .perfect-bonus-status{
+    margin:0 0 5px!important;padding:4px 7px!important;min-height:0!important;
+    font-size:9px!important;gap:5px!important
+  }
+  .perfect-bonus-detail{display:none}
+  .perfect-bonus-status strong{font-size:12px!important}
+
+  /* One-line HUD: ROUND / TARGET / HP / TIME / REROLL. */
+  .stats{
+    position:sticky;top:0;z-index:30;
+    display:grid!important;grid-template-columns:.85fr 1fr 1.25fr 1.25fr 1fr!important;
+    gap:3px!important;margin:0 0 5px!important;padding:4px 0!important;
+    background:var(--bg)
+  }
+  .stats .stat,.stats .stat:last-child{
+    grid-column:auto!important;min-width:0!important;min-height:48px!important;
+    padding:4px 3px!important;border-radius:6px!important
+  }
+  .stat small{font-size:7px!important;letter-spacing:.02em!important;white-space:nowrap}
+  .stat strong{font-size:17px!important;line-height:1.05!important;margin-top:1px!important}
+  .stat .bar{height:4px!important;margin-top:3px!important}
+
+  /* Battle panels become dense; explanatory copy is desktop-only during play. */
+  .game-main>.panel{padding:7px!important;margin-bottom:5px!important;border-radius:7px!important}
+  .game-main>.panel>h2{font-size:10px!important;margin:0 0 5px!important;letter-spacing:.04em!important}
+  .game-main>.panel>.help{display:none!important}
+
+  /* All five cards stay on one row. */
+  #cards.cards{
+    display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    gap:4px!important
+  }
+  #cards .cardbtn{
+    min-height:76px!important;height:76px!important;padding:4px 2px!important;
+    border-radius:7px!important;font-size:25px!important
+  }
+  #cards .cardbtn::before{inset:3px!important;border-radius:4px!important}
+  #cards .cardtype,#cards .cardfoot{font-size:6px!important;letter-spacing:0!important}
+
+  /* Expression + three main actions fit directly below the hand. */
+  #expression.expression{
+    min-height:43px!important;padding:6px!important;margin-bottom:5px!important;
+    font-size:17px!important;gap:3px!important;overflow-x:auto!important;white-space:nowrap
+  }
+  #expression .token{padding:4px 6px!important;font-size:15px!important}
+  .game-main>.panel .actions{display:grid!important;grid-template-columns:.8fr 1.25fr 1.25fr!important;gap:4px!important}
+  #undo,#calculate,#reroll{
+    min-width:0!important;padding:9px 3px!important;font-size:11px!important;white-space:normal!important;line-height:1.15!important
+  }
+
+  /* Game-over/result message should not reserve space during normal play. */
+  #gameover:not(.show){display:none!important}
+  .message:empty{display:none!important}
+  .message{margin:4px 0!important;padding:7px!important;font-size:11px!important}
+
+  /* Collection information is intentionally below the core battle cockpit. */
+  #specials{grid-template-columns:1fr 1fr!important}
+  .game-main>.panel:has(#specials){margin-top:8px!important}
+
+  /* Secondary navigation is compact and below gameplay. */
+  .game-main>.actions{display:grid!important;grid-template-columns:1.4fr 1fr 1fr!important;gap:4px!important;margin-top:5px!important}
+  #nextRound,#restart,#backTitle{padding:9px 4px!important;font-size:11px!important}
+}
+
+@media (max-width:390px){
+  #cards .cardbtn{min-height:68px!important;height:68px!important;font-size:22px!important}
+  .stats .stat,.stats .stat:last-child{min-height:44px!important}
+  .stat strong{font-size:15px!important}
+  #expression.expression{min-height:39px!important;font-size:15px!important}
+  #undo,#calculate,#reroll{padding:8px 2px!important;font-size:10px!important}
+}
+
+/* ===== Mobile UI v2: readability ===== */
+@media (max-width: 600px){
+  body{font-size:16px}
+  button,input,select{font-size:16px}
+  .mobile-hud,.hud,.status-bar,.top-status{font-size:13px}
+  .card,.number-card,.num-card{font-size:clamp(22px,7vw,30px)}
+  .operator,.op-btn,.operator-btn{font-size:20px}
+  .title-subtitle,.subtitle,.game-description,.title-description{font-size:14px;line-height:1.55}
+  .account-menu,.account-panel,.profile-menu{font-size:14px}
+}
+
+
+/* ===== Online Battle v1 ===== */
+.online-lobby-panel{
+  margin:12px 0;
+  padding:12px 14px;
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:12px;
+  border:1px solid #405476;
+  border-radius:14px;
+  background:#101a2b;
+}
+.online-lobby-panel.hidden{display:none}
+.online-lobby-panel p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.online-lobby-spinner{
+  width:24px;height:24px;border-radius:50%;
+  border:3px solid #33425c;border-top-color:#7ca7ff;
+  animation:onlineSpin .8s linear infinite;
+}
+@keyframes onlineSpin{to{transform:rotate(360deg)}}
+
+.online-battle-screen{
+  width:min(980px,calc(100% - 24px));
+  margin:20px auto 50px;
+}
+.online-battle-screen.hidden{display:none}
+.online-battle-shell{display:grid;gap:14px}
+.online-battle-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.online-battle-head h1{margin:2px 0 0}
+.online-battle-head small{color:#7ca7ff;font-weight:900;letter-spacing:.16em}
+.online-versus{
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;
+}
+.online-player{
+  min-width:0;padding:13px 14px;border:1px solid var(--border);border-radius:15px;background:var(--panel);
+  display:grid;gap:4px;
+}
+.online-player.you{text-align:left}
+.online-player.opponent{text-align:right}
+.online-player small{color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.12em}
+.online-player strong{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.online-player span{font-size:12px;color:var(--muted)}
+.online-vs-mark{font-weight:950;font-size:20px;color:#7ca7ff}
+.online-battle-stats{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.online-battle-stats>div{
+  padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--panel);text-align:center;
+}
+.online-battle-stats small{display:block;color:var(--muted);font-size:11px}
+.online-battle-stats strong{display:block;margin-top:3px;font-size:24px}
+.online-result-panel.hidden{display:none}
+.online-result-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0;
+}
+.online-result-grid>div{
+  padding:12px;border:1px solid var(--border);border-radius:12px;background:#0e1726;display:grid;gap:4px;
+}
+.online-result-grid small{color:var(--muted)}
+.online-result-grid strong{font-size:20px}
+.online-result-grid span{font-size:12px;overflow-wrap:anywhere}
+.online-card-used{opacity:.35!important}
+
+@media(max-width:600px){
+  .online-battle-screen{width:calc(100% - 14px);margin-top:8px}
+  .online-versus{grid-template-columns:1fr auto 1fr;gap:6px}
+  .online-player{padding:10px 8px}
+  .online-player strong{font-size:14px}
+  .online-player span{font-size:11px}
+  .online-vs-mark{font-size:16px}
+  .online-battle-stats>div{padding:9px}
+  .online-battle-stats strong{font-size:20px}
+  .online-lobby-panel{grid-template-columns:auto 1fr}
+  .online-lobby-panel #cancelOnlineMatch{grid-column:1 / -1}
+}
 
 </style>
 </head>
@@ -1056,13 +1267,13 @@ button.warn{background:#4a3918;border-color:#886e31}
   <section id="startScreen" class="start-screen">
     <div class="start-card">
       <h1>5枚カード式バトル</h1>
-      <p>数字カード3枚と記号カード2枚を、すべて使って1つの式を作るゲームです。</p>
+      <p>数字カード3枚と記号カード2枚をすべて使って式を作り、目標値以上を目指すゲームです。</p>
       <ul>
-        <li>カードはクリック、またはドラッグで並べ替えられます。</li>
-        <li>目標に届かなかった分だけ体力が減ります。</li>
-        <li>時間切れ後は、毎秒体力が減ります。</li>
-        <li>引き直しは各ラウンド3回までです。</li>
-        <li>制限時間は全ラウンド一律30秒です。</li><li>2ラウンド終了するごとに特殊カードを1枚獲得します。</li>
+        <li>5枚のカードはクリック、またはドラッグで好きな順番に並べ替えられます。</li>
+        <li>作った式の答えが目標値以上ならクリア。届かなかった分だけHPが減ります。</li>
+        <li>制限時間は30秒。時間切れ後は毎秒HPが減っていきます。</li>
+        <li>手札が悪いときは、1ラウンドにつき3回まで引き直せます。</li>
+        <li>数字3枚・記号2枚は、すべて式の中で使う必要があります。</li><li>2ラウンドクリアするごとに特殊カードを1枚獲得。効果を組み合わせて有利に進められます。</li>
       </ul>
       
 <div class="mode-select">
@@ -1077,10 +1288,10 @@ button.warn{background:#4a3918;border-color:#886e31}
     <span class="mode-desc">Googleログイン必須。RPと名前をアカウントごとに保存する</span>
     <span class="mode-status">RP戦</span>
   </button>
-  <button class="mode-card locked" type="button" disabled>
+  <button id="onlineModeButton" class="mode-card" type="button">
     <span class="mode-title">Online Battle</span>
-    <span class="mode-desc">ほかのプレイヤーとの対戦モード</span>
-    <span class="mode-status">今後追加予定</span>
+    <span class="mode-desc">Googleログイン必須。同じ手札・同じ目標で1vs1対戦</span>
+    <span class="mode-status">1 VS 1</span>
   </button>
 </div>
 
@@ -1094,13 +1305,21 @@ button.warn{background:#4a3918;border-color:#886e31}
       <button id="googleAccountButton" class="google-account-button hidden" type="button" aria-label="Googleアカウントメニュー" title="Googleアカウントメニュー" aria-expanded="false">
         <img id="googleAccountIcon" class="google-account-icon" alt="" referrerpolicy="no-referrer">
       </button>
+        <div class="account-record-hint" id="accountRecordHint">
+          ↑ アイコンをクリックすると、レート・RP・ランキング順位などの戦績を確認できます
+        </div>
       <div id="googleAccountMenu" class="google-account-menu hidden" role="dialog" aria-label="Googleアカウントメニュー">
         <div class="google-account-menu-head">
           <img id="googleAccountMenuAvatar" class="google-account-menu-avatar" alt="" referrerpolicy="no-referrer">
           <div id="googleAccountMenuName" class="google-account-menu-name"></div>
           <div id="googleAccountMenuEmail" class="google-account-menu-email"></div>
         </div>
-        <button id="manageGoogleAccountButton" class="google-account-menu-action primary" type="button">Googleアカウントを管理</button>
+        <div id="googleAccountStats" class="google-account-stats">
+          <div><span>現在のレート</span><strong id="googleAccountRate">—</strong></div>
+          <div><span>レートポイント</span><strong id="googleAccountRP">—</strong></div>
+          <div id="googleAccountRankRow" class="hidden"><span>ランキング順位</span><strong id="googleAccountRank">—</strong></div>
+        </div>
+        <button id="manageGoogleAccountButton" class="google-account-menu-action" type="button">Googleアカウントを管理</button>
         <button id="switchGoogleAccountButton" class="google-account-menu-action" type="button">別のGoogleアカウントでログイン</button>
         <button id="menuGoogleLogoutButton" class="google-account-menu-action danger" type="button">ゲームからログアウト</button>
       </div>
@@ -1108,6 +1327,15 @@ button.warn{background:#4a3918;border-color:#886e31}
       <button id="googleLogoutButton" class="auth-button secondary hidden" type="button">ログアウト</button>
     </div>
     <p id="authNote" class="auth-note">Solo Playはログイン不要で、プレイデータは保存されません。Solo RankはGoogleログインが必要です。</p>
+  </div>
+
+  <div id="onlineLobbyPanel" class="online-lobby-panel hidden" aria-live="polite">
+    <div class="online-lobby-spinner" aria-hidden="true"></div>
+    <div>
+      <strong id="onlineLobbyTitle">対戦相手を探しています...</strong>
+      <p id="onlineLobbyText">オンラインのプレイヤーと自動でマッチングします。</p>
+    </div>
+    <button id="cancelOnlineMatch" class="action" type="button">キャンセル</button>
   </div>
   <button id="startButton" type="button"><span id="startButtonText">Solo Playを開始</span></button>
 
@@ -1135,35 +1363,6 @@ button.warn{background:#4a3918;border-color:#886e31}
   <section id="gameScreen" class="hidden">
     <h1>5枚カード式バトル</h1>
     <div class="game-layout">
-      <aside class="rarity-guide">
-        <h2>特殊カードのレアリティ</h2>
-        <p>カード効果を回復・防御・目標軽減・再抽選・演算子補正の総合力で再評価。上ほど強いですが、単体で勝敗が決まる効果は抑えています。</p>
-        
-<div class="rarity-pyramid" aria-label="レアリティのピラミッド">
-  <button type="button" class="pyramid-tier r10" data-rarity="r10">MYTHIC 1%</button>
-  <button type="button" class="pyramid-tier r9" data-rarity="r9">CELESTIAL 2%</button>
-  <button type="button" class="pyramid-tier r8" data-rarity="r8">DIVINE 3%</button>
-  <button type="button" class="pyramid-tier r7" data-rarity="r7">LEGENDARY 5%</button>
-  <button type="button" class="pyramid-tier r6" data-rarity="r6">EPIC 7%</button>
-  <button type="button" class="pyramid-tier r5" data-rarity="r5">HEROIC 10%</button>
-  <button type="button" class="pyramid-tier r4" data-rarity="r4">RARE 12%</button>
-  <button type="button" class="pyramid-tier r3" data-rarity="r3">UNCOMMON 15%</button>
-  <button type="button" class="pyramid-tier r2" data-rarity="r2">COMMON 20%</button>
-  <button type="button" class="pyramid-tier r1" data-rarity="r1">JUNK 25%</button>
-</div>
-<div class="rarity-legend">
-  <div class="rarity-row"><span class="rarity-dot r10"></span><span>MYTHIC</span><small>神話級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r9"></span><span>CELESTIAL</span><small>天界級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r8"></span><span>DIVINE</span><small>神聖級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r7"></span><span>LEGENDARY</span><small>伝説級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r6"></span><span>EPIC</span><small>叙事級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r5"></span><span>HEROIC</span><small>英雄級</small></div>
-  <div class="rarity-row"><span class="rarity-dot r4"></span><span>RARE</span><small>希少</small></div>
-  <div class="rarity-row"><span class="rarity-dot r3"></span><span>UNCOMMON</span><small>少し珍しい</small></div>
-  <div class="rarity-row"><span class="rarity-dot r2"></span><span>COMMON</span><small>普通</small></div>
-  <div class="rarity-row"><span class="rarity-dot r1"></span><span>JUNK</span><small>ボロい</small></div>
-</div>
-</aside>
       <div class="game-main">
 
     <div id="currentModeBanner" class="current-mode-banner solo" aria-live="polite">
@@ -1221,6 +1420,34 @@ button.warn{background:#4a3918;border-color:#886e31}
     </div>
       </div>
       <aside class="history-panel">
+        <section class="rarity-pie-section">
+          <h2>特殊カードのレアリティ</h2>
+          <p class="operator-prob-note">特殊カード獲得時の基本出現率</p>
+
+          <div class="rarity-pie-compact-wrap">
+            <div class="rarity-pie-compact"
+                 role="img"
+                 aria-label="MYTHIC 1%、CELESTIAL 2%、DIVINE 3%、LEGENDARY 5%、EPIC 7%、HEROIC 10%、RARE 12%、UNCOMMON 15%、COMMON 20%、JUNK 25%">
+              <div class="rarity-pie-center">
+                <strong>100%</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="rarity-pie-list">
+            <div><i class="rp-mythic"></i><span>MYTHIC</span><strong>1%</strong></div>
+            <div><i class="rp-celestial"></i><span>CELESTIAL</span><strong>2%</strong></div>
+            <div><i class="rp-divine"></i><span>DIVINE</span><strong>3%</strong></div>
+            <div><i class="rp-legendary"></i><span>LEGENDARY</span><strong>5%</strong></div>
+            <div><i class="rp-epic"></i><span>EPIC</span><strong>7%</strong></div>
+            <div><i class="rp-heroic"></i><span>HEROIC</span><strong>10%</strong></div>
+            <div><i class="rp-rare"></i><span>RARE</span><strong>12%</strong></div>
+            <div><i class="rp-uncommon"></i><span>UNCOMMON</span><strong>15%</strong></div>
+            <div><i class="rp-common"></i><span>COMMON</span><strong>20%</strong></div>
+            <div><i class="rp-junk"></i><span>JUNK</span><strong>25%</strong></div>
+          </div>
+        </section>
+
         <section class="operator-prob-section">
           <h2>演算子の出現率</h2>
           <p class="operator-prob-note">特殊カードの効果を反映した現在値</p>
@@ -1231,7 +1458,7 @@ button.warn{background:#4a3918;border-color:#886e31}
             <h2 id="rankingHeading" style="margin:0">ランキング</h2>
             <button id="refreshRanking" class="action" type="button" style="padding:5px 9px;font-size:12px">更新</button>
           </div>
-          <p id="rankingNote" class="operator-prob-note">Solo Playの端末内記録</p>
+          <p id="rankingNote" class="operator-prob-note">クリアしたラウンド数で競うオンラインランキング</p>
           <div id="rankingList" class="ranking-list">
             <p class="history-empty">まだ記録はありません。</p>
           </div>
@@ -1245,6 +1472,86 @@ button.warn{background:#4a3918;border-color:#886e31}
       </aside>
     </div>
   </section>
+
+  <section id="onlineBattleScreen" class="online-battle-screen hidden">
+    <div class="online-battle-shell">
+      <div class="online-battle-head">
+        <div>
+          <small>ONLINE BATTLE</small>
+          <h1>1 VS 1</h1>
+        </div>
+        <button id="onlineExitButton" class="action" type="button">タイトルへ</button>
+      </div>
+
+      <div class="online-versus">
+        <div class="online-player you">
+          <small>YOU</small>
+          <strong id="onlineYouName">Player</strong>
+          <span id="onlineYouStatus">考え中...</span>
+        </div>
+        <div class="online-vs-mark">VS</div>
+        <div class="online-player opponent">
+          <small>OPPONENT</small>
+          <strong id="onlineOpponentName">Player</strong>
+          <span id="onlineOpponentStatus">考え中...</span>
+        </div>
+      </div>
+
+      <div class="online-battle-stats online-battle-stats-five-rounds">
+        <div><small>問題</small><strong id="onlineRound">1 / 5</strong></div>
+        <div><small>全体残り時間</small><strong id="onlineTime">30</strong></div>
+      </div>
+
+      <section class="panel online-play-panel">
+        <h2>両プレイヤー共通の5枚</h2>
+        <div id="onlineCards" class="cards"></div>
+        <p class="help">両者にまったく同じカードが配られています。5枚すべてを使って式を作ります。</p>
+      </section>
+
+      <section class="panel online-play-panel">
+        <h2>作った式</h2>
+        <div id="onlineExpression" class="expression">カードを順番に選択</div>
+        <div class="actions">
+          <button id="onlineUndo" class="action" type="button">1つ戻す</button>
+          <button id="onlineSubmit" class="action primary" type="button" disabled>回答を確定</button>
+        </div>
+        <p class="help">数字 → 記号 → 数字 → 記号 → 数字 の順に選択してください。回答は1回だけです。</p>
+      </section>
+
+      <div id="onlineBattleMessage" class="message" aria-live="polite">対戦開始！</div>
+
+      <section id="onlineResultPanel" class="panel online-result-panel hidden">
+        <h2 id="onlineResultTitle">RESULT</h2>
+        <div class="online-result-grid">
+          <div>
+            <small>あなた</small>
+            <strong id="onlineYourResult">—</strong>
+            <span id="onlineYourExpression">5問の合計ポイント</span>
+            <span class="online-result-time">合計回答時間 <strong id="onlineYourTime">—</strong></span>
+          </div>
+          <div>
+            <small>相手</small>
+            <strong id="onlineOpponentResult">—</strong>
+            <span id="onlineOpponentExpression">5問の合計ポイント</span>
+            <span class="online-result-time">合計回答時間 <strong id="onlineOpponentTime">—</strong></span>
+          </div>
+        </div>
+        <div class="online-result-chart-wrap">
+          <div class="online-result-chart-head">
+            <span>縦軸：累計最適解ポイント（pt）</span>
+            <span>横軸：対戦開始からの経過時間（秒）</span>
+          </div>
+          <div class="online-result-chart-stage">
+            <svg id="onlineResultChart" class="online-result-chart" viewBox="0 0 760 320" role="img" aria-label="オンラインバトル結果の折れ線グラフ"></svg>
+            <div id="onlineChartTooltip" class="online-chart-tooltip hidden" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        <p id="onlineResultReason" class="help"></p>
+        <button id="onlineResultBack" class="action primary" type="button">タイトルへ戻る</button>
+      </section>
+    </div>
+  </section>
+
 </main>
 
 
@@ -2002,6 +2309,8 @@ function battle(){
       playSound("success");
       show(`成功！ ${makeExpression()} = ${shown}${efficiencyResult?` / ${efficiencyResult.title}`:""}`,"ok");
       addHistory("success",`Round ${state.round}｜${efficiencyResult?efficiencyResult.title:"RESULT"}`,`あなた: ${makeExpression()} = ${shown}\n最高: ${efficiencyResult?efficiencyResult.bestExpression:"-"} = ${efficiencyResult?efficiencyResult.bestShown:"-"}\n目標: ${effectiveTarget}`);
+      // ブラウザを閉じても記録が消えないよう、このラウンドをクリアした時点でオンライン保存。
+      saveSoloProgress(state.round);
     }else{
       const rawShortage=Math.ceil(effectiveTarget-value);
       let shortage=Math.max(0,Math.ceil(rawShortage*(1-state.effects.damageReduce)));
@@ -2043,46 +2352,37 @@ function advanceRound(){
 
 
 
-function submitScore(){
-  if(!state.playerName)return;
-
-  const newEntry={
+async function saveSoloProgress(clearedRounds){
+  if(!state.playerName || selectedGameMode!=="solo")return false;
+  const safeRounds=Math.max(0,Math.round(Number(clearedRounds)||0));
+  const entry={
     name:state.playerName.trim(),
-    round:Math.max(0,state.round-1),
+    round:safeRounds,
     hp:state.hp,
     lastTarget:state.lastClearedTarget||0,
-    rank:getSoloRank(Math.max(0,state.round-1)).label,
-    rankKey:getSoloRank(Math.max(0,state.round-1)).name,
-    time:Date.now()
+    rank:getSoloRank(safeRounds).label,
+    rankKey:getSoloRank(safeRounds).name
   };
-  const normalizedName=newEntry.name.toLocaleLowerCase("ja-JP");
 
-  const existingIndex=state.ranking.findIndex(entry=>
-    String(entry.name).trim().toLocaleLowerCase("ja-JP")===normalizedName
-  );
-
-  if(existingIndex===-1){
-    state.ranking.push(newEntry);
-  }else{
-    const oldEntry=state.ranking[existingIndex];
-    const isBetter=
-      newEntry.round>oldEntry.round ||
-      (newEntry.round===oldEntry.round && newEntry.hp>oldEntry.hp) ||
-      (newEntry.round===oldEntry.round && newEntry.hp===oldEntry.hp &&
-       newEntry.lastTarget>(oldEntry.lastTarget||0));
-
-    if(isBetter){
-      state.ranking[existingIndex]=newEntry;
+  try{
+    if(window.firebaseBridge?.getUser()){
+      const saved=await window.firebaseBridge.saveSoloScore(entry);
+      if(saved) renderRanking();
+      return saved;
     }
+  }catch(error){
+    console.error("Solo Playオンライン記録の保存に失敗しました",error);
   }
+  return false;
+}
 
-  state.ranking.sort((a,b)=>
-    b.round-a.round ||
-    b.hp-a.hp ||
-    (b.lastTarget||0)-(a.lastTarget||0) ||
-    a.time-b.time
-  );
-  state.ranking=state.ranking.slice(0,10);
+async function submitScore(){
+  if(!state.playerName)return;
+
+  const clearedRounds=Math.max(0,state.round-1);
+  // Game Over時にも保存を試みる。
+  // すでに各ラウンド成功時に保存しているため、ここでは未保存分の保険になる。
+  await saveSoloProgress(clearedRounds);
   renderRanking();
 }
 
@@ -2156,29 +2456,58 @@ async function renderOnlineRanking(){
   }
 }
 
-function renderRanking(){
-  if(selectedGameMode==="rank"){renderOnlineRanking();return;}
+async function renderSoloOnlineRanking(){
   const box=$("rankingList");
-  $("rankingHeading").textContent="ランキング";
-  $("rankingNote").textContent="Solo Playの端末内記録";
-  box.innerHTML="";
-  if(state.ranking.length===0){
-    box.innerHTML='<p class="history-empty">まだ記録はありません。</p>';
+  const heading=$("rankingHeading");
+  const note=$("rankingNote");
+  if(!box)return;
+
+  heading.textContent="Solo Play オンラインランキング";
+  const loggedIn=Boolean(window.firebaseBridge?.getUser());
+  note.textContent=loggedIn
+    ?"クリアするたびに自動保存。クリアラウンド数で競うオンラインランキング"
+    :"ランキング閲覧は可能です。自分の記録を保存するにはGoogleログインが必要です。";
+
+  box.innerHTML='<p class="history-empty">ランキングを読み込み中...</p>';
+
+  try{
+    if(!window.firebaseBridge)throw new Error("Firebaseの読み込みが完了していません。");
+    const entries=await window.firebaseBridge.loadSoloLeaderboard(10);
+    box.innerHTML="";
+
+    if(!entries.length){
+      box.innerHTML='<p class="history-empty">まだオンライン記録がありません。</p>';
+      return;
+    }
+
+    const currentUid=window.firebaseBridge.getUser()?.uid||"";
+    entries.forEach((entry,index)=>{
+      const round=Math.max(0,Math.round(Number(entry.round)||0));
+      const soloRank=getSoloRank(round);
+      const row=document.createElement("div");
+      row.className="ranking-row"+(entry.uid===currentUid?" current":"");
+      row.innerHTML=`
+        <span class="rank-number">${index+1}</span>
+        <span class="rank-name">${escapeHtml(entry.displayName||entry.name||"Player")}</span>
+        <span class="rank-score">
+          <strong>${round}R クリア</strong>
+          <small class="ranking-rank rank-${soloRank.name.toLowerCase()}">${soloRank.label}</small>
+          <small>${entry.uid===currentUid?"あなた":"ONLINE"}</small>
+        </span>`;
+      box.appendChild(row);
+    });
+  }catch(error){
+    console.error("Solo Playオンラインランキング取得エラー:",error);
+    box.innerHTML=`<p class="history-empty">ランキングを取得できませんでした。<br>${escapeHtml(error?.message||"")}</p>`;
+  }
+}
+
+function renderRanking(){
+  if(selectedGameMode==="rank"){
+    renderOnlineRanking();
     return;
   }
-  state.ranking.forEach((entry,index)=>{
-    const row=document.createElement("div");
-    row.className="ranking-row"+(entry.name===state.playerName?" current":"");
-    row.innerHTML=`
-      <span class="rank-number">${index+1}</span>
-      <span class="rank-name">${escapeHtml(entry.name)}</span>
-      <span class="rank-score">
-      <strong>R${entry.round}</strong>
-      <small class="ranking-rank rank-${String(entry.rankKey||getSoloRank(entry.round).name).toLowerCase()}">${entry.rank||getSoloRank(entry.round).label}</small>
-      <small>必要数 ${entry.lastTarget||0} / HP ${entry.hp}</small>
-    </span>`;
-    box.appendChild(row);
-  });
+  renderSoloOnlineRanking();
 }
 
 function escapeHtml(text){
@@ -2364,7 +2693,12 @@ function giveSpecialReward(){
   $("rewardDescription").textContent=reward.description;
   $("rewardRarity").textContent=reward.rarityLabel;
   $("rewardRarity").className=`reward-rarity rarity-badge ${reward.rarity}`;
-  modal.classList.toggle("perfect-bonus-modal",queueItem.bonus);
+  modal.classList.remove("perfect-bonus-modal");
+  if(queueItem.bonus){
+    // 外側だけ再アニメーション。カード固有のr9/r10アニメーションには触れない。
+    void modal.offsetWidth;
+    modal.classList.add("perfect-bonus-modal");
+  }
   modal.classList.remove("hidden");
   render();
 }
@@ -2516,6 +2850,913 @@ function render(){
   $("reroll").disabled=state.gameOver||state.roundResolved||state.rerollsLeft<=0;
 }
 
+
+// ===== Online Battle v1 =====
+const onlineBattleState={
+  matching:false,
+  queueSessionId:"",
+  matchId:"",
+  user:null,
+  opponent:null,
+  cards:[],
+  chosen:[],
+  target:0,
+  timeLeft:30,
+  timerId:null,
+  pollId:null,
+  startedAtMs:0,
+  submitted:false,
+  result:null,
+  roundIndex:0,
+  roundResults:[],
+  challenges:[],
+  finishedAtMs:0,
+  presenceId:null,
+  forfeitHandled:false
+};
+
+function onlineHashSeed(str){
+  let h=2166136261>>>0;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return h>>>0;
+}
+function onlineRng(seed){
+  let a=seed>>>0;
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function onlineApply(a,op,b){
+  if(op==="+")return a+b;
+  if(op==="-")return a-b;
+  if(op==="*")return a*b;
+  if(op==="/"){if(b===0)throw new Error("0では割れません");return a/b;}
+  if(op==="%"){if(b===0)throw new Error("0で余りは求められません");return a%b;}
+  if(op==="^"){
+    const v=Math.pow(a,b);
+    if(!Number.isFinite(v)||Math.abs(v)>1e12)throw new Error("数が大きすぎます");
+    return v;
+  }
+  throw new Error("不明な演算子です");
+}
+function onlineEvaluateSequence(seq){
+  let nums=[seq[0].value,seq[2].value,seq[4].value];
+  let ops=[seq[1].value,seq[3].value];
+  for(let i=ops.length-1;i>=0;i--){
+    if(ops[i]==="^"){
+      nums[i]=onlineApply(nums[i],"^",nums[i+1]);nums.splice(i+1,1);ops.splice(i,1);
+    }
+  }
+  for(let i=0;i<ops.length;){
+    if(["*","/","%"].includes(ops[i])){
+      nums[i]=onlineApply(nums[i],ops[i],nums[i+1]);nums.splice(i+1,1);ops.splice(i,1);
+    }else i++;
+  }
+  let result=nums[0];
+  for(let i=0;i<ops.length;i++)result=onlineApply(result,ops[i],nums[i+1]);
+  return result;
+}
+function onlinePermutations(items){
+  if(items.length<=1)return [items.slice()];
+  const out=[];
+  items.forEach((item,i)=>{
+    const rest=items.slice(0,i).concat(items.slice(i+1));
+    onlinePermutations(rest).forEach(p=>out.push([item,...p]));
+  });
+  return out;
+}
+function createOnlineChallenge(matchId){
+  const rng=onlineRng(onlineHashSeed(matchId));
+  const nums=[0,1,2].map((_,i)=>{
+    const n=1+Math.floor(rng()*9);
+    return {id:`on_n${i}`,type:"number",value:n,label:String(n),name:"NUMBER"};
+  });
+  const opsBase=[
+    {value:"+",label:"＋",name:"ADD"},
+    {value:"-",label:"−",name:"SUB"},
+    {value:"*",label:"×",name:"MUL"},
+    {value:"/",label:"÷",name:"DIV"},
+    {value:"%",label:"%",name:"MOD"},
+    {value:"^",label:"^",name:"POW"}
+  ];
+  const first=Math.floor(rng()*opsBase.length);
+  let second=Math.floor(rng()*opsBase.length);
+  if(second===first)second=(second+1+Math.floor(rng()*(opsBase.length-1)))%opsBase.length;
+  const ops=[opsBase[first],opsBase[second]].map((o,i)=>({
+    id:`on_o${i}`,type:"operator",value:o.value,label:o.label,name:o.name
+  }));
+  const cards=[...nums,...ops];
+
+  const possible=[];
+  for(const np of onlinePermutations(nums)){
+    for(const op of onlinePermutations(ops)){
+      const seq=[np[0],op[0],np[1],op[1],np[2]];
+      try{
+        const value=onlineEvaluateSequence(seq);
+        if(!Number.isFinite(value))continue;
+        if(value>=8&&value<=500&&Math.abs(value-Math.round(value))<1e-9){
+          possible.push(Math.round(value));
+        }
+      }catch(_){}
+    }
+  }
+  const unique=[...new Set(possible)].sort((a,b)=>a-b);
+  let target;
+  if(unique.length){
+    const lower=Math.floor(unique.length*.45);
+    const upper=Math.max(lower,Math.floor(unique.length*.8));
+    const pick=lower+Math.floor(rng()*(upper-lower+1));
+    target=unique[Math.min(unique.length-1,pick)];
+  }else{
+    target=10+Math.floor(rng()*91);
+  }
+
+  // Display order is deterministic too.
+  const shuffled=cards.slice();
+  for(let i=shuffled.length-1;i>0;i--){
+    const j=Math.floor(rng()*(i+1));
+    [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+  }
+  return {cards:shuffled,target};
+}
+function onlineExpectedType(){
+  return onlineBattleState.chosen.length%2===0?"number":"operator";
+}
+function onlineExpressionText(){
+  return onlineBattleState.chosen.map(c=>c.label).join("");
+}
+function onlineRender(){
+  const cardsBox=$("onlineCards");
+  if(!cardsBox)return;
+  cardsBox.innerHTML="";
+  onlineBattleState.cards.forEach(card=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="cardbtn";
+    if(onlineBattleState.chosen.some(c=>c.id===card.id))b.classList.add("online-card-used");
+    b.disabled=onlineBattleState.submitted||onlineBattleState.chosen.some(c=>c.id===card.id);
+    const top=document.createElement("span");
+    top.className="cardtype";
+    top.textContent=card.type==="number"?"NUMBER":"OPERATOR";
+    const foot=document.createElement("span");
+    foot.className="cardfoot";
+    foot.textContent=card.name;
+    b.append(top,document.createTextNode(card.label),foot);
+    b.addEventListener("click",()=>onlineChooseCard(card.id));
+    cardsBox.appendChild(b);
+  });
+  $("onlineExpression").textContent=onlineBattleState.chosen.length?onlineExpressionText():"カードを順番に選択";
+  $("onlineSubmit").disabled=onlineBattleState.submitted||onlineBattleState.chosen.length!==5;
+  $("onlineUndo").disabled=onlineBattleState.submitted||onlineBattleState.chosen.length===0;
+  $("onlineTime").textContent=Math.max(0,onlineBattleState.timeLeft);
+  $("onlineRound").textContent=`${Math.min(5,onlineBattleState.roundIndex+1)} / 5`;
+}
+function onlineChooseCard(id){
+  if(onlineBattleState.submitted)return;
+  const card=onlineBattleState.cards.find(c=>c.id===id);
+  if(!card||onlineBattleState.chosen.some(c=>c.id===id))return;
+  const expected=onlineExpectedType();
+  if(card.type!==expected){
+    $("onlineBattleMessage").className="message bad";
+    $("onlineBattleMessage").textContent=expected==="number"?"次は数字カードです。":"次は記号カードです。";
+    return;
+  }
+  onlineBattleState.chosen.push(card);
+  playSound("select");
+  onlineRender();
+}
+function onlineUndo(){
+  if(onlineBattleState.submitted)return;
+  onlineBattleState.chosen.pop();
+  playSound("undo");
+  onlineRender();
+}
+function onlineEvaluateCurrent(){
+  if(onlineBattleState.chosen.length!==5)throw new Error("5枚すべてを使ってください");
+  return onlineEvaluateSequence(onlineBattleState.chosen);
+}
+function onlineNearlyEqual(a,b){
+  const x=Number(a),y=Number(b);
+  if(!Number.isFinite(x)||!Number.isFinite(y))return false;
+  return Math.abs(x-y)<=1e-9*Math.max(1,Math.abs(x),Math.abs(y));
+}
+
+function onlineOutcomeQuality(value,target){
+  const v=Number(value),t=Number(target);
+  // Existing Online Battle philosophy:
+  // 1) Reaching the target is better than not reaching it.
+  // 2) If reached, smaller overshoot is better.
+  // 3) If not reached, the larger value (closer from below) is better.
+  return {
+    achieved:v>=t,
+    gap:v>=t?v-t:t-v,
+    value:v
+  };
+}
+
+function onlineBuildOutcomeRanking(challenge){
+  const numbers=challenge.cards.filter(c=>c.type==="number");
+  const operators=challenge.cards.filter(c=>c.type==="operator");
+  const outcomes=[];
+
+  for(const np of onlinePermutations(numbers)){
+    for(const op of onlinePermutations(operators)){
+      const seq=[np[0],op[0],np[1],op[1],np[2]];
+      try{
+        const value=onlineEvaluateSequence(seq);
+        if(!Number.isFinite(value))continue;
+        if(Math.abs(value)>1e12)continue;
+
+        // Different expressions that produce the same numeric answer share one rank.
+        if(!outcomes.some(o=>onlineNearlyEqual(o.value,value))){
+          outcomes.push({
+            value,
+            expression:seq.map(c=>c.label).join("")
+          });
+        }
+      }catch(_){}
+    }
+  }
+
+  outcomes.sort((a,b)=>{
+    const qa=onlineOutcomeQuality(a.value,challenge.target);
+    const qb=onlineOutcomeQuality(b.value,challenge.target);
+
+    if(qa.achieved!==qb.achieved)return qa.achieved?-1:1;
+    if(qa.achieved){
+      if(!onlineNearlyEqual(qa.gap,qb.gap))return qa.gap-qb.gap;
+    }else{
+      if(!onlineNearlyEqual(qa.value,qb.value))return qb.value-qa.value;
+    }
+    return 0;
+  });
+
+  return outcomes.map((o,index)=>({
+    ...o,
+    rank:index+1,
+    points:20-index
+  }));
+}
+
+function onlineScoreRound(round,challenge){
+  const ranking=onlineBuildOutcomeRanking(challenge);
+  const timeoutPoints=20-ranking.length; // one point below the worst legal answer
+
+  if(!round || round.timedOut || round.value===null || !Number.isFinite(Number(round.value))){
+    return {
+      rank:ranking.length+1,
+      points:timeoutPoints,
+      timeout:true,
+      totalRanks:ranking.length,
+      best:ranking[0]||null,
+      worst:ranking[ranking.length-1]||null
+    };
+  }
+
+  const found=ranking.find(item=>onlineNearlyEqual(item.value,round.value));
+  if(found){
+    return {
+      rank:found.rank,
+      points:found.points,
+      timeout:false,
+      totalRanks:ranking.length,
+      best:ranking[0]||null,
+      worst:ranking[ranking.length-1]||null
+    };
+  }
+
+  // Defensive fallback: an answer that cannot be reproduced from the five cards
+  // is treated just below the worst legal result.
+  return {
+    rank:ranking.length+1,
+    points:timeoutPoints,
+    timeout:false,
+    totalRanks:ranking.length,
+    best:ranking[0]||null,
+    worst:ranking[ranking.length-1]||null
+  };
+}
+
+function onlineCompareFiveRounds(a,b){
+  const detailA=[];
+  const detailB=[];
+  let scoreA=0,scoreB=0;
+
+  for(let i=0;i<5;i++){
+    const sa=onlineScoreRound(a?.rounds?.[i],onlineBattleState.challenges[i]);
+    const sb=onlineScoreRound(b?.rounds?.[i],onlineBattleState.challenges[i]);
+    detailA.push(sa);
+    detailB.push(sb);
+    scoreA+=sa.points;
+    scoreB+=sb.points;
+  }
+
+  let winnerUid=null;
+  if(scoreA!==scoreB){
+    winnerUid=scoreA>scoreB?a.uid:b.uid;
+  }else{
+    // Same total points: faster completion wins.
+    const ta=Number(a?.elapsedMs)||30000;
+    const tb=Number(b?.elapsedMs)||30000;
+    if(ta!==tb)winnerUid=ta<tb?a.uid:b.uid;
+  }
+
+  return {winnerUid,scoreA,scoreB,detailA,detailB};
+}
+
+function onlineFormatElapsed(result){
+  const ms=Math.max(0,Number(result?.elapsedMs)||0);
+  return `${(ms/1000).toFixed(2)}秒`;
+}
+
+function renderOnlineResultChart({me,opponent,myDetails,opDetails,myScore,opScore,winnerUid,myUid}){
+  const svg=$("onlineResultChart");
+  if(!svg)return;
+
+  const W=760,H=320;
+  const left=52,right=18,top=22,bottom=48;
+  const plotW=W-left-right,plotH=H-top-bottom;
+
+  // X axis = elapsed time from battle start. Each Q point appears when that
+  // question was confirmed. TIME OUT is placed at 30 seconds.
+  function cumulativeTimes(result){
+    const out=[];
+    let total=0;
+    for(let i=0;i<5;i++){
+      const round=result?.rounds?.[i];
+      if(round?.timedOut){
+        total=30;
+      }else{
+        total+=Math.max(0,Number(round?.elapsedMs)||0)/1000;
+        total=Math.min(30,total);
+      }
+      out.push(total);
+    }
+    return out;
+  }
+
+  // Y axis = cumulative optimal-answer points.
+  function cumulativePoints(details){
+    const out=[];
+    let total=0;
+    for(let i=0;i<5;i++){
+      total+=Number(details?.[i]?.points)||0;
+      out.push(total);
+    }
+    return out;
+  }
+
+  const myX=cumulativeTimes(me);
+  const opX=cumulativeTimes(opponent);
+  const myY=cumulativePoints(myDetails);
+  const opY=cumulativePoints(opDetails);
+  const maxY=Math.max(100,...myY,...opY,20);
+  const yTop=Math.ceil(maxY/10)*10;
+
+  const x=v=>left+(Math.max(0,Math.min(30,v))/30)*plotW;
+  const y=v=>top+plotH-(Math.max(0,Math.min(yTop,v))/yTop)*plotH;
+
+  const myWon=winnerUid===myUid;
+  const draw=!winnerUid;
+  const myColor=draw?"#8da2c4":myWon?"#42c96b":"#ef5555";
+  const opColor=draw?"#8da2c4":myWon?"#ef5555":"#42c96b";
+
+  const esc=s=>String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+
+  const pieces=[];
+  pieces.push(`<rect x="0" y="0" width="${W}" height="${H}" rx="12" fill="#0b1422"/>`);
+
+  // Grid and Y labels.
+  for(let i=0;i<=5;i++){
+    const value=Math.round(yTop*i/5);
+    const yy=y(value);
+    pieces.push(`<line x1="${left}" y1="${yy}" x2="${W-right}" y2="${yy}" stroke="#26344b" stroke-width="1"/>`);
+    pieces.push(`<text x="${left-9}" y="${yy+4}" text-anchor="end" fill="#8290a8" font-size="10">${value}</text>`);
+  }
+  // X labels.
+  for(let sec=0;sec<=30;sec+=5){
+    const xx=x(sec);
+    pieces.push(`<line x1="${xx}" y1="${top}" x2="${xx}" y2="${top+plotH}" stroke="#1d2a3d" stroke-width="1"/>`);
+    pieces.push(`<text x="${xx}" y="${H-18}" text-anchor="middle" fill="#8290a8" font-size="10">${sec}</text>`);
+  }
+
+  pieces.push(`<line x1="${left}" y1="${top+plotH}" x2="${W-right}" y2="${top+plotH}" stroke="#64748b"/>`);
+  pieces.push(`<line x1="${left}" y1="${top}" x2="${left}" y2="${top+plotH}" stroke="#64748b"/>`);
+  pieces.push(`<text x="${left+plotW/2}" y="${H-3}" text-anchor="middle" fill="#a8b5ca" font-size="11" font-weight="700">経過時間（秒）</text>`);
+  pieces.push(`<text x="13" y="${top+plotH/2}" text-anchor="middle" fill="#a8b5ca" font-size="11" font-weight="700" transform="rotate(-90 13 ${top+plotH/2})">累計最適解ポイント（pt）</text>`);
+
+  function pathFor(xs,ys){
+    let d=`M ${x(0)} ${y(0)}`;
+    for(let i=0;i<5;i++)d+=` L ${x(xs[i])} ${y(ys[i])}`;
+    return d;
+  }
+
+  pieces.push(`<path d="${pathFor(myX,myY)}" fill="none" stroke="${myColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`);
+  pieces.push(`<path d="${pathFor(opX,opY)}" fill="none" stroke="${opColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`);
+
+  function pointMeta(result,details,i,side){
+    const round=result?.rounds?.[i]||{};
+    const detail=details?.[i]||{};
+    return {
+      side,
+      q:i+1,
+      points:Number(detail.points)||0,
+      rank:Number(detail.rank)||0,
+      timeout:Boolean(detail.timeout),
+      value:round.value,
+      expression:round.expression||"",
+      elapsedMs:Number(round.elapsedMs)||0,
+      cumulativeMs:Math.round((side==="you"?myX[i]:opX[i])*1000)
+    };
+  }
+
+  function drawPoints(xs,ys,color,side,details,result){
+    for(let i=0;i<5;i++){
+      const cx=x(xs[i]),cy=y(ys[i]);
+      const meta=pointMeta(result,details,i,side);
+      const payload=encodeURIComponent(JSON.stringify(meta));
+      const isOptimal=!meta.timeout && meta.rank===1;
+      if(isOptimal){
+        pieces.push(`<circle class="online-optimal-pulse" cx="${cx}" cy="${cy}" r="9" fill="none" stroke="${color}" stroke-width="2"/>`);
+        pieces.push(`<circle class="online-optimal-ring" cx="${cx}" cy="${cy}" r="11" fill="none" stroke="${color}" stroke-width="1.5"/>`);
+      }
+      pieces.push(`<circle class="online-chart-point${isOptimal?" is-optimal":""}" data-point="${payload}" cx="${cx}" cy="${cy}" r="${isOptimal?7:6}" fill="${color}" stroke="${isOptimal?"#ffffff":"#0b1422"}" stroke-width="${isOptimal?2.5:2}" tabindex="0"/>`);
+      pieces.push(`<circle class="online-chart-hit" data-point="${payload}" cx="${cx}" cy="${cy}" r="14" fill="transparent" tabindex="0"/>`);
+      pieces.push(`<text x="${cx}" y="${cy-10}" text-anchor="middle" fill="${color}" font-size="10" font-weight="800">Q${i+1}${isOptimal?" ★":""}</text>`);
+    }
+  }
+  drawPoints(myX,myY,myColor,"you",myDetails,me);
+  drawPoints(opX,opY,opColor,"opponent",opDetails,opponent);
+
+  const myName=esc($("onlineYouName")?.textContent||"YOU");
+  const opName=esc($("onlineOpponentName")?.textContent||"OPPONENT");
+  pieces.push(`<line x1="${left+10}" y1="12" x2="${left+34}" y2="12" stroke="${myColor}" stroke-width="3"/>`);
+  pieces.push(`<text x="${left+40}" y="16" fill="#dbe6f7" font-size="11">${myName} ${myScore}pt</text>`);
+  pieces.push(`<line x1="${left+180}" y1="12" x2="${left+204}" y2="12" stroke="${opColor}" stroke-width="3"/>`);
+  pieces.push(`<text x="${left+210}" y="16" fill="#dbe6f7" font-size="11">${opName} ${opScore}pt</text>`);
+
+  svg.innerHTML=pieces.join("");
+
+  const tooltip=$("onlineChartTooltip");
+  const stage=svg.closest(".online-result-chart-stage");
+
+  function showPointDetail(target){
+    if(!tooltip||!stage||!target?.dataset?.point)return;
+    let meta;
+    try{meta=JSON.parse(decodeURIComponent(target.dataset.point));}catch(_){return;}
+
+    const sideLabel=meta.side==="you"
+      ? ($("onlineYouName")?.textContent||"あなた")
+      : ($("onlineOpponentName")?.textContent||"相手");
+
+    const rankText=meta.timeout
+      ? `${meta.rank}番目扱い`
+      : meta.rank===1
+        ? "1番目（最適解）"
+        : `${meta.rank}番目`;
+    const valueText=meta.timeout?"TIME OUT":String(meta.value??"—");
+    const expressionText=meta.expression||"—";
+    const timeText=`${(Math.max(0,meta.elapsedMs)/1000).toFixed(2)}秒`;
+
+    tooltip.innerHTML=`
+      <div class="online-chart-tooltip-title">${esc(sideLabel)}・Q${meta.q}</div>
+      <div class="online-chart-tooltip-grid">
+        <span>ポイント</span><strong>${meta.points}pt</strong>
+        <span>最適解から</span><strong>${rankText}</strong>
+        <span>回答値</span><strong>${esc(valueText)}</strong>
+        <span>回答時間</span><strong>${timeText}</strong>
+        <span>式</span><strong>${esc(expressionText)}</strong>
+      </div>`;
+
+    const svgRect=svg.getBoundingClientRect();
+    const stageRect=stage.getBoundingClientRect();
+    const cx=Number(target.getAttribute("cx"))||0;
+    const cy=Number(target.getAttribute("cy"))||0;
+    const px=(cx/760)*svgRect.width+(svgRect.left-stageRect.left);
+    const py=(cy/320)*svgRect.height+(svgRect.top-stageRect.top);
+
+    tooltip.style.left=`${Math.max(8,Math.min(stageRect.width-230,px+12))}px`;
+    tooltip.style.top=`${Math.max(8,py-24)}px`;
+    tooltip.classList.remove("hidden");
+  }
+
+  function hidePointDetail(){
+    tooltip?.classList.add("hidden");
+  }
+
+  svg.querySelectorAll(".online-chart-hit,.online-chart-point").forEach(el=>{
+    el.addEventListener("mouseenter",()=>showPointDetail(el));
+    el.addEventListener("focus",()=>showPointDetail(el));
+    el.addEventListener("click",event=>{
+      event.stopPropagation();
+      showPointDetail(el);
+    });
+  });
+
+  stage?.addEventListener("mouseleave",hidePointDetail);
+  document.addEventListener("click",event=>{
+    if(stage&&!stage.contains(event.target))hidePointDetail();
+  },{once:true});
+}
+function onlineShowResult(me,opponent){
+  onlineStopPresence();
+  $("onlineResultChart")?.classList.remove("hidden");
+  const pair=[me,opponent].slice().sort((x,y)=>String(x.uid||"").localeCompare(String(y.uid||"")));
+  const compare=onlineCompareFiveRounds(pair[0],pair[1]);
+  const myUid=onlineBattleState.user?.uid||me.uid||"";
+  const title=$("onlineResultTitle");
+
+  if(!compare.winnerUid)title.textContent="DRAW";
+  else if(compare.winnerUid===myUid)title.textContent="YOU WIN";
+  else title.textContent="YOU LOSE";
+
+  const meIsA=pair[0].uid===myUid;
+  const myScore=meIsA?compare.scoreA:compare.scoreB;
+  const opScore=meIsA?compare.scoreB:compare.scoreA;
+  const myDetails=meIsA?compare.detailA:compare.detailB;
+  const opDetails=meIsA?compare.detailB:compare.detailA;
+
+  $("onlineYourResult").textContent=`${myScore} pt`;
+  $("onlineOpponentResult").textContent=`${opScore} pt`;
+  $("onlineYourTime").textContent=onlineFormatElapsed(me);
+  $("onlineOpponentTime").textContent=onlineFormatElapsed(opponent);
+
+  renderOnlineResultChart({
+    me,
+    opponent,
+    myDetails,
+    opDetails,
+    myScore,
+    opScore,
+    winnerUid:compare.winnerUid,
+    myUid
+  });
+  $("onlineResultPanel").classList.remove("hidden");
+  localStorage.removeItem("fiveCardOnlineActiveMatch");
+  $("onlineBattleMessage").textContent="対戦終了";
+
+  if(compare.winnerUid===myUid)playSound("success");
+  else if(compare.winnerUid)playSound("damage",5);
+}
+async function onlineSubmitAnswer(autoTimeout=false){
+  if(onlineBattleState.submitted)return;
+
+  // A global 30-second timer covers all five questions.
+  if(autoTimeout){
+    onlineBattleState.submitted=true;
+    clearInterval(onlineBattleState.timerId);
+    onlineBattleState.finishedAtMs=Date.now();
+
+    // Any unanswered rounds are recorded as timeouts.
+    while(onlineBattleState.roundResults.length<5){
+      onlineBattleState.roundResults.push({
+        round:onlineBattleState.roundResults.length+1,
+        value:null,
+        expression:"",
+        elapsedMs:30000,
+        timedOut:true
+      });
+    }
+    await onlineSendFinalFiveRoundResult(true);
+    return;
+  }
+
+  let value,expression;
+  try{
+    value=onlineEvaluateCurrent();
+    expression=onlineExpressionText();
+  }catch(error){
+    $("onlineBattleMessage").className="message bad";
+    $("onlineBattleMessage").textContent=error.message;
+    return;
+  }
+
+  const now=Date.now();
+  const previousElapsed=onlineBattleState.roundResults.length
+    ? onlineBattleState.roundResults[onlineBattleState.roundResults.length-1].elapsedTotalMs
+    : 0;
+  const elapsedTotalMs=Math.max(0,now-onlineBattleState.startedAtMs);
+  const roundElapsedMs=Math.max(0,elapsedTotalMs-previousElapsed);
+
+  onlineBattleState.roundResults.push({
+    round:onlineBattleState.roundIndex+1,
+    value:Math.round(value*1e9)/1e9,
+    expression,
+    elapsedMs:roundElapsedMs,
+    elapsedTotalMs
+  });
+
+  playSound("success");
+
+  // Immediately continue to the next question after confirming Q1-Q4.
+  if(onlineBattleState.roundIndex<4){
+    onlineBattleState.submitted=false;
+    onlineBattleState.roundIndex++;
+    const challenge=onlineBattleState.challenges[onlineBattleState.roundIndex];
+    onlineBattleState.cards=challenge.cards;
+    onlineBattleState.target=challenge.target;
+    onlineBattleState.chosen=[];
+    $("onlineBattleMessage").className="message ok";
+    $("onlineBattleMessage").textContent=`第${onlineBattleState.roundIndex}問を確定。第${onlineBattleState.roundIndex+1}問へ！`;
+    onlineRender();
+    return;
+  }
+
+  // Q5 finished: submit once, then wait for opponent.
+  onlineBattleState.submitted=true;
+  onlineBattleState.finishedAtMs=Date.now();
+  clearInterval(onlineBattleState.timerId);
+  await onlineSendFinalFiveRoundResult(false);
+}
+
+async function onlineSendFinalFiveRoundResult(forcedTimeout){
+  const totalElapsedMs=Math.min(30000,Math.max(0,(onlineBattleState.finishedAtMs||Date.now())-onlineBattleState.startedAtMs));
+  const result={
+    uid:onlineBattleState.user?.uid||"",
+    rounds:onlineBattleState.roundResults.slice(0,5),
+    elapsedMs:totalElapsedMs,
+    timedOut:Boolean(forcedTimeout)
+  };
+  onlineBattleState.result=result;
+
+  $("onlineYouStatus").textContent=forcedTimeout?"時間切れ":"5問回答済み";
+  $("onlineBattleMessage").className="message ok";
+  $("onlineBattleMessage").textContent=forcedTimeout
+    ?"30秒経過。対戦を終了します..."
+    :"5問終了！相手の回答を待っています...";
+
+  onlineRender();
+
+  try{
+    await window.firebaseBridge.submitOnlineBattleResult(onlineBattleState.matchId,result);
+    onlineStartResultPolling();
+  }catch(error){
+    $("onlineBattleMessage").className="message bad";
+    $("onlineBattleMessage").textContent=error?.message||"回答の送信に失敗しました。";
+  }
+}
+function onlineStopPresence(){
+  clearInterval(onlineBattleState.presenceId);
+  onlineBattleState.presenceId=null;
+}
+function onlineShowForfeitResult(iWon){
+  clearInterval(onlineBattleState.timerId);
+  clearInterval(onlineBattleState.pollId);
+  onlineStopPresence();
+  onlineBattleState.submitted=true;
+  onlineBattleState.forfeitHandled=true;
+  $("onlineResultTitle").textContent=iWon?"YOU WIN":"YOU LOSE";
+  $("onlineYourResult").textContent=iWon?"WIN":"LOSE";
+  $("onlineOpponentResult").textContent=iWon?"LOSE":"WIN";
+  $("onlineYourExpression").textContent=iWon?"相手が対戦から切断":"対戦から切断";
+  $("onlineOpponentExpression").textContent=iWon?"対戦から切断":"接続継続";
+  $("onlineYourTime").textContent="—";
+  $("onlineOpponentTime").textContent="—";
+  $("onlineResultChart")?.classList.add("hidden");
+  $("onlineResultPanel").classList.remove("hidden");
+  localStorage.removeItem("fiveCardOnlineActiveMatch");
+  $("onlineBattleMessage").className="message";
+  $("onlineBattleMessage").textContent=iWon
+    ?"対戦相手の切断を確認したため、あなたの勝利です。"
+    :"前回のOnline Battleは途中切断により敗北しました。";
+  if(iWon)playSound("success"); else playSound("damage",5);
+}
+async function onlineCheckPresence(){
+  if(!onlineBattleState.matchId||onlineBattleState.forfeitHandled)return;
+  try{
+    const status=await window.firebaseBridge.getOnlineBattleStatus(onlineBattleState.matchId);
+    const myUid=onlineBattleState.user?.uid;
+    const opponentUid=onlineBattleState.opponent?.uid;
+    if(status?.forfeit?.loserUid){
+      onlineShowForfeitResult(status.forfeit.winnerUid===myUid);
+      return;
+    }
+    const opponentLast=Number(status?.presence?.[opponentUid])||0;
+    // Heartbeat is every 2 seconds. Give 7 seconds to survive brief network jitter.
+    if(opponentLast && Date.now()-opponentLast>7000){
+      const forfeit=await window.firebaseBridge.recordOnlineForfeit(onlineBattleState.matchId,opponentUid);
+      onlineShowForfeitResult(forfeit.winnerUid===myUid);
+    }
+  }catch(error){
+    // Do not award a win just because this client temporarily lost its own connection.
+    console.warn("接続状態確認エラー",error);
+  }
+}
+function onlineStartPresence(){
+  onlineStopPresence();
+  const beat=async()=>{
+    if(!onlineBattleState.matchId||onlineBattleState.forfeitHandled)return;
+    try{
+      await window.firebaseBridge.touchOnlineBattlePresence(onlineBattleState.matchId);
+      await onlineCheckPresence();
+    }catch(error){
+      console.warn("Online Battle heartbeat error",error);
+    }
+  };
+  beat();
+  onlineBattleState.presenceId=setInterval(beat,2000);
+}
+function onlineStartResultPolling(){
+  clearInterval(onlineBattleState.pollId);
+  const check=async()=>{
+    try{
+      const results=await window.firebaseBridge.loadOnlineBattleResults(onlineBattleState.matchId);
+      const myUid=onlineBattleState.user?.uid;
+      const opponentUid=onlineBattleState.opponent?.uid;
+      const opponentResult=results.find(r=>r.uid===opponentUid);
+      if(opponentResult){
+        $("onlineOpponentStatus").textContent=opponentResult.timedOut?"時間切れ":"5問回答済み";
+      }
+      const myResult=results.find(r=>r.uid===myUid)||onlineBattleState.result;
+      if(myResult&&opponentResult){
+        clearInterval(onlineBattleState.pollId);
+        onlineShowResult(myResult,opponentResult);
+      }
+    }catch(error){
+      console.warn("オンライン結果確認エラー",error);
+    }
+  };
+  check();
+  onlineBattleState.pollId=setInterval(check,1000);
+}
+function onlineFormatValue(result){
+  if(result?.timedOut||result?.value===null||typeof result?.value==="undefined")return "TIME OUT";
+  const n=Number(result.value);
+  return Number.isInteger(n)?String(n):String(Math.round(n*100)/100);
+}
+
+
+async function onlineBeginMatch(pair){
+  onlineBattleState.matching=false;
+  clearInterval(onlineBattleState.pollId);
+
+  const myUser=window.firebaseBridge.getUser();
+  const opponent=pair.players.find(p=>p.uid!==myUser.uid);
+  const ids=pair.players.map(p=>p.sessionId).sort();
+  const matchId="m_"+ids.join("_");
+  const challenges=Array.from({length:5},(_,i)=>createOnlineChallenge(`${matchId}_q${i+1}`));
+  const challenge=challenges[0];
+
+  await window.firebaseBridge.ensureOnlineBattleMatch({
+    matchId,
+    players:pair.players.map(p=>p.uid),
+    names:Object.fromEntries(pair.players.map(p=>[p.uid,p.name])),
+    target:challenge.target,
+    cards:challenge.cards.map(c=>({type:c.type,value:c.value,label:c.label,name:c.name,id:c.id}))
+  });
+
+  onlineBattleState.matchId=matchId;
+  onlineBattleState.user=myUser;
+  onlineBattleState.opponent=opponent;
+  localStorage.setItem("fiveCardOnlineActiveMatch",JSON.stringify({
+    matchId,
+    opponent,
+    userUid:myUser.uid,
+    savedAtMs:Date.now()
+  }));
+  onlineBattleState.challenges=challenges;
+  onlineBattleState.roundIndex=0;
+  onlineBattleState.roundResults=[];
+  onlineBattleState.cards=challenge.cards;
+  onlineBattleState.chosen=[];
+  onlineBattleState.target=challenge.target;
+  onlineBattleState.timeLeft=30;
+  onlineBattleState.startedAtMs=Date.now();
+  onlineBattleState.submitted=false;
+  onlineBattleState.result=null;
+  onlineBattleState.forfeitHandled=false;
+
+  $("onlineLobbyPanel").classList.add("hidden");
+  $("startScreen").classList.add("hidden");
+  $("gameScreen").classList.add("hidden");
+  $("onlineBattleScreen").classList.remove("hidden");
+  $("onlineYouName").textContent=$("playerName").value.trim()||myUser.displayName||"Player";
+  $("onlineOpponentName").textContent=opponent?.name||"Opponent";
+  $("onlineYouStatus").textContent="考え中...";
+  $("onlineOpponentStatus").textContent="考え中...";
+  $("onlineResultPanel").classList.add("hidden");
+  $("onlineExitButton")?.classList.add("hidden");
+  $("onlineBattleMessage").className="message";
+  $("onlineBattleMessage").textContent="対戦開始！30秒以内に回答してください。";
+  onlineRender();
+  onlineStartPresence();
+
+  // Give the opponent enough time to detect the same queue pair, then remove own queue entry.
+  setTimeout(()=>window.firebaseBridge?.leaveOnlineQueue().catch(()=>{}),5000);
+
+  clearInterval(onlineBattleState.timerId);
+  onlineBattleState.timerId=setInterval(()=>{
+    if(onlineBattleState.submitted)return;
+    onlineBattleState.timeLeft--;
+    if(onlineBattleState.timeLeft<=5&&onlineBattleState.timeLeft>0)playSound("tick");
+    onlineRender();
+    if(onlineBattleState.timeLeft<=0){
+      onlineBattleState.timeLeft=0;
+      onlineRender();
+      onlineSubmitAnswer(true);
+    }
+  },1000);
+}
+async function onlinePollMatch(){
+  if(!onlineBattleState.matching)return;
+  try{
+    const pair=await window.firebaseBridge.findOnlineBattlePair();
+    if(pair){
+      await onlineBeginMatch(pair);
+      return;
+    }
+    $("onlineLobbyText").textContent="対戦相手を探しています。別のプレイヤーがOnline Battleを開始すると自動で対戦します。";
+  }catch(error){
+    console.error("マッチングエラー",error);
+    $("onlineLobbyText").textContent=error?.message||"マッチングに失敗しました。";
+  }
+}
+async function startOnlineMatchmaking(){
+  if(onlineBattleState.matching)return;
+  if(!window.firebaseBridge){
+    alert("Firebaseの読み込みが完了していません。");
+    return;
+  }
+  try{
+    const user=await window.firebaseBridge.requireOnlineLogin();
+    const name=$("playerName").value.trim();
+    if(!name){
+      $("nameError")?.classList.remove("hidden");
+      $("playerName").focus();
+      return;
+    }
+    $("nameError")?.classList.add("hidden");
+    onlineBattleState.user=user;
+    onlineBattleState.matching=true;
+    $("onlineLobbyPanel").classList.remove("hidden");
+    $("onlineLobbyTitle").textContent="対戦相手を探しています...";
+    $("onlineLobbyText").textContent="マッチングキューに参加しています。";
+    await window.firebaseBridge.joinOnlineQueue(name);
+    clearInterval(onlineBattleState.pollId);
+    onlineBattleState.pollId=setInterval(onlinePollMatch,1200);
+    onlinePollMatch();
+  }catch(error){
+    onlineBattleState.matching=false;
+    $("onlineLobbyPanel").classList.add("hidden");
+    alert(error?.message||"Online Battleを開始できませんでした。");
+  }
+}
+async function cancelOnlineMatchmaking(){
+  onlineBattleState.matching=false;
+  clearInterval(onlineBattleState.pollId);
+  $("onlineLobbyPanel")?.classList.add("hidden");
+  try{await window.firebaseBridge?.leaveOnlineQueue();}catch(_){}
+}
+
+async function onlineRecoverDisconnectedMatch(){
+  const raw=localStorage.getItem("fiveCardOnlineActiveMatch");
+  if(!raw||!window.firebaseBridge)return;
+  let saved;
+  try{saved=JSON.parse(raw);}catch(_){localStorage.removeItem("fiveCardOnlineActiveMatch");return;}
+  const user=window.firebaseBridge.getUser?.();
+  if(!user||user.uid!==saved.userUid)return;
+  try{
+    const status=await window.firebaseBridge.getOnlineBattleStatus(saved.matchId);
+    if(status?.forfeit?.loserUid===user.uid){
+      onlineBattleState.matchId=saved.matchId;
+      onlineBattleState.user=user;
+      onlineBattleState.opponent=saved.opponent;
+      $("startScreen")?.classList.add("hidden");
+      $("gameScreen")?.classList.add("hidden");
+      $("onlineBattleScreen")?.classList.remove("hidden");
+      $("onlineLobbyPanel")?.classList.add("hidden");
+      $("onlineYouName").textContent=$("playerName")?.value?.trim()||user.displayName||"Player";
+      $("onlineOpponentName").textContent=saved.opponent?.name||"Opponent";
+      $("onlineExitButton")?.classList.add("hidden");
+      onlineShowForfeitResult(false);
+    }else if(status?.forfeit?.winnerUid===user.uid){
+      localStorage.removeItem("fiveCardOnlineActiveMatch");
+    }
+  }catch(error){
+    console.warn("前回Online Battle確認エラー",error);
+  }
+}
+setTimeout(onlineRecoverDisconnectedMatch,1500);
+setTimeout(onlineRecoverDisconnectedMatch,3500);
+
+function onlineReturnToTitle(){
+  onlineStopPresence();
+  clearInterval(onlineBattleState.timerId);
+  clearInterval(onlineBattleState.pollId);
+  onlineBattleState.matching=false;
+  window.firebaseBridge?.leaveOnlineQueue().catch(()=>{});
+  $("onlineBattleScreen")?.classList.add("hidden");
+  $("onlineLobbyPanel")?.classList.add("hidden");
+  $("startScreen")?.classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"instant"});
+}
+
 document.addEventListener("DOMContentLoaded",()=>{
 
 
@@ -2531,6 +3772,13 @@ if(soundToggle){
 
 const soloModeButton=$("soloModeButton");
 const rankModeButton=$("rankModeButton");
+const onlineModeButton=$("onlineModeButton");
+if(onlineModeButton){
+  onlineModeButton.disabled=false;
+  onlineModeButton.removeAttribute("disabled");
+  onlineModeButton.classList.remove("locked");
+  onlineModeButton.setAttribute("aria-disabled","false");
+}
 const googleLoginButton=$("googleLoginButton");
 const googleLogoutButton=$("googleLogoutButton");
 const googleAccountButton=$("googleAccountButton");
@@ -2577,15 +3825,28 @@ function selectMode(mode){
   selectedGameMode=mode;
   soloModeButton.classList.toggle("selected",mode==="solo");
   rankModeButton.classList.toggle("selected",mode==="rank");
-  $("startButtonText").textContent=mode==="rank"?"Solo Rank Playを開始":"Solo Playを開始";
+  onlineModeButton.classList.toggle("selected",mode==="online");
+  $("startButtonText").textContent=
+    mode==="rank"?"Solo Rank Playを開始":
+    mode==="online"?"Online Battleを開始":
+    "Solo Playを開始";
+  const authNote=$("authNote");
+  if(authNote){
+    authNote.textContent=
+      mode==="online"?"Online BattleはGoogleログイン必須です。同じ手札・同じ目標で1vs1対戦します。":
+      mode==="rank"?"Solo RankはGoogleログイン必須。RPとプレイヤー名をアカウントに保存します。":
+      "Solo Playはログインなしでも遊べます。ログイン中はオンライン最高記録も保存されます。";
+  }
+  if(mode!=="online")$("onlineLobbyPanel")?.classList.add("hidden");
   renderRanking();
   playSound("select");
 }
 soloModeButton.addEventListener("click",()=>selectMode("solo"));
 rankModeButton.addEventListener("click",()=>selectMode("rank"));
+onlineModeButton.addEventListener("click",()=>selectMode("online"));
 $("refreshRanking")?.addEventListener("click",()=>renderRanking());
 
-$("startButton").addEventListener("click",startGame);
+$("startButton").addEventListener("click",()=>selectedGameMode==="online"?startOnlineMatchmaking():startGame());
 
 
 $("playerName").addEventListener("input",()=>{
@@ -2593,7 +3854,7 @@ $("playerName").addEventListener("input",()=>{
 });
 
 $("playerName").addEventListener("keydown",e=>{
-  if(e.key==="Enter")startGame();
+  if(e.key==="Enter")(selectedGameMode==="online"?startOnlineMatchmaking():startGame());
 });
 document.querySelectorAll(".pyramid-tier[data-rarity]").forEach(button=>{
   button.addEventListener("click",()=>openRarityCatalog(button.dataset.rarity));
@@ -2659,6 +3920,13 @@ function returnToTitle(){
   window.scrollTo({top:0,behavior:"instant"});
 }
 
+$("cancelOnlineMatch")?.addEventListener("click",cancelOnlineMatchmaking);
+$("onlineUndo")?.addEventListener("click",onlineUndo);
+$("onlineSubmit")?.addEventListener("click",()=>onlineSubmitAnswer(false));
+
+$("onlineExitButton")?.addEventListener("click",onlineReturnToTitle);
+$("onlineResultBack")?.addEventListener("click",onlineReturnToTitle);
+
 $("backTitle")?.addEventListener("click",returnToTitle);
 // 画面更新で個別リスナーが外れてもタイトルボタンを確実に拾う。
 document.addEventListener("click",event=>{
@@ -2702,7 +3970,7 @@ Never grant permanent rarity multipliers.
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
 const statusEl=document.getElementById("authStatus");
 const accountButton=document.getElementById("googleAccountButton");
@@ -2710,6 +3978,11 @@ const accountIcon=document.getElementById("googleAccountIcon");
 const accountMenuAvatar=document.getElementById("googleAccountMenuAvatar");
 const accountMenuName=document.getElementById("googleAccountMenuName");
 const accountMenuEmail=document.getElementById("googleAccountMenuEmail");
+const accountRate=document.getElementById("googleAccountRate");
+const accountRP=document.getElementById("googleAccountRP");
+const accountRankRow=document.getElementById("googleAccountRankRow");
+const accountRank=document.getElementById("googleAccountRank");
+const playerNameInput=document.getElementById("playerName");
 const loginButton=document.getElementById("googleLoginButton");
 const logoutButton=document.getElementById("googleLogoutButton");
 const authNote=document.getElementById("authNote");
@@ -2717,6 +3990,7 @@ const configured=Boolean(firebaseConfig?.apiKey && !String(firebaseConfig.apiKey
 let auth=null;
 let db=null;
 let currentUser=null;
+let onlineQueueSessionId="";
 
 function updateAuthUI(user){
   currentUser=user||null;
@@ -2759,6 +4033,94 @@ function escapeHtml(value){
   return String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
 
+
+function ratingLabel(rating){
+  const r=Math.max(0,Math.round(Number(rating)||100));
+  if(r>=2000)return "レジェンド";
+  if(r>=1800)return "グランドマスター";
+  if(r>=1600)return "マスター";
+  if(r>=1400)return "ダイヤモンド";
+  if(r>=1200)return "プラチナ";
+  if(r>=1000)return "ゴールド";
+  if(r>=800)return "シルバー";
+  if(r>=600)return "ブロンズ";
+  return "ビギナー";
+}
+
+async function findLeaderboardPosition(uid){
+  if(!db||!uid)return {position:null,total:0};
+  try{
+    // アカウント欄では「自分の順位 / ランキング登録者総数」を表示するため、
+    // leaderboard全体を取得して現在ユーザーの位置を求める。
+    const q=query(collection(db,"leaderboard"),orderBy("rating","desc"));
+    const snapshot=await getDocs(q);
+    const index=snapshot.docs.findIndex(item=>item.id===uid);
+    return {
+      position:index>=0 ? index+1 : null,
+      total:snapshot.size
+    };
+  }catch(error){
+    console.warn("ランキング順位の取得に失敗しました",error);
+    return {position:null,total:0};
+  }
+}
+
+async function applySavedProfileToUI(user,profile){
+  if(!user||!profile)return;
+  const rating=Math.max(0,Math.round(Number(profile.rating)||100));
+  const savedName=String(profile.displayName||"").trim().slice(0,16);
+
+  // Google名ではなく、Firestoreに保存されたゲーム内プレイヤー名を表示。
+  accountMenuName.textContent=savedName || user.displayName || "Player";
+  accountMenuEmail.textContent=user.email||"";
+
+  if(accountRate)accountRate.textContent=ratingLabel(rating);
+  if(accountRP)accountRP.textContent=`${rating} RP`;
+
+  const rankingInfo=await findLeaderboardPosition(user.uid);
+  if(accountRankRow&&accountRank){
+    if(rankingInfo.position){
+      accountRank.textContent=`${rankingInfo.position}位 / ${rankingInfo.total}人中`;
+      accountRankRow.classList.remove("hidden");
+    }else{
+      accountRank.textContent=rankingInfo.total>0 ? `圏外 / ${rankingInfo.total}人中` : "—";
+      accountRankRow.classList.toggle("hidden",rankingInfo.total===0);
+    }
+  }
+
+  // 保存済みプレイヤー名を次回ログイン時に自動入力。
+  if(playerNameInput && savedName){
+    playerNameInput.value=savedName;
+  }
+  if(typeof renderRanking==="function" && selectedGameMode==="solo"){
+    renderRanking();
+  }
+}
+
+async function savePlayerNameForCurrentUser(){
+  if(!db||!currentUser||!playerNameInput)return;
+  const safeName=String(playerNameInput.value||"").trim().slice(0,16);
+  if(!safeName)return;
+
+  const profile=await ensureProfileDocument(currentUser);
+  const rating=Math.max(0,Math.round(Number(profile?.rating)||100));
+
+  await Promise.all([
+    setDoc(doc(db,"users",currentUser.uid),{
+      displayName:safeName,
+      updatedAt:serverTimestamp()
+    },{merge:true}),
+    setDoc(doc(db,"leaderboard",currentUser.uid),{
+      uid:currentUser.uid,
+      rating,
+      displayName:safeName,
+      updatedAt:serverTimestamp()
+    },{merge:true})
+  ]);
+
+  accountMenuName.textContent=safeName;
+}
+
 async function ensureProfileDocument(user){
   if(!db||!user)return null;
   const ref=doc(db,"users",user.uid);
@@ -2790,15 +4152,27 @@ if(configured){
     currentUser=user||null;
     updateAuthUI(user);
     if(user){
-      try{await ensureProfileDocument(user);}
+      try{
+        const profile=await ensureProfileDocument(user);
+        await applySavedProfileToUI(user,profile);
+      }
       catch(error){
-        console.error("ユーザーデータの初期作成に失敗しました",error);
+        console.error("ユーザーデータの読み込みに失敗しました",error);
         statusEl.textContent="ログイン済み（保存エラー）";
         statusEl.classList.add("auth-error");
       }
     }
   });
 }else updateAuthUI(null);
+
+if(playerNameInput){
+  playerNameInput.addEventListener("change",()=>{
+    savePlayerNameForCurrentUser().catch(error=>console.warn("プレイヤー名の保存に失敗しました",error));
+  });
+  playerNameInput.addEventListener("blur",()=>{
+    savePlayerNameForCurrentUser().catch(error=>console.warn("プレイヤー名の保存に失敗しました",error));
+  });
+}
 
 window.firebaseBridge={
   isConfigured:()=>configured,
@@ -2810,7 +4184,8 @@ window.firebaseBridge={
     const result=await signInWithPopup(auth,provider);
     currentUser=result.user;
     updateAuthUI(currentUser);
-    await ensureProfileDocument(currentUser);
+    const profile=await ensureProfileDocument(currentUser);
+    await applySavedProfileToUI(currentUser,profile);
     return currentUser;
   },
   async signOut(){
@@ -2820,6 +4195,11 @@ window.firebaseBridge={
   },
   async requireRankLogin(){
     if(!configured)throw new Error("Firebaseが未設定のためSolo Rankを開始できません。");
+    if(currentUser)return currentUser;
+    return this.signIn();
+  },
+  async requireOnlineLogin(){
+    if(!configured)throw new Error("Firebaseが未設定のためOnline Battleを開始できません。");
     if(currentUser)return currentUser;
     return this.signIn();
   },
@@ -2844,16 +4224,585 @@ window.firebaseBridge={
         updatedAt:serverTimestamp()
       },{merge:true})
     ]);
+    accountMenuName.textContent=safeName;
+    if(playerNameInput)playerNameInput.value=safeName;
+    if(accountRate)accountRate.textContent=ratingLabel(safeRating);
+    if(accountRP)accountRP.textContent=`${safeRating} RP`;
+    const rankingInfo=await findLeaderboardPosition(user.uid);
+    if(accountRankRow&&accountRank){
+      if(rankingInfo.position){
+        accountRank.textContent=`${rankingInfo.position}位 / ${rankingInfo.total}人中`;
+        accountRankRow.classList.remove("hidden");
+      }else{
+        accountRank.textContent=rankingInfo.total>0 ? `圏外 / ${rankingInfo.total}人中` : "—";
+        accountRankRow.classList.toggle("hidden",rankingInfo.total===0);
+      }
+    }
     if(typeof renderOnlineRanking==="function"&&selectedGameMode==="rank")renderOnlineRanking();
+  },
+  async joinOnlineQueue(displayName){
+    const user=await this.requireOnlineLogin();
+    const safeName=String(displayName||user.displayName||"Player").trim().slice(0,16)||"Player";
+    onlineQueueSessionId=`${Date.now().toString(36)}${Math.random().toString(36).slice(2,9)}`;
+    const now=Date.now();
+    await setDoc(doc(db,"onlineQueue",user.uid),{
+      uid:user.uid,
+      name:safeName,
+      sessionId:onlineQueueSessionId,
+      joinedAtMs:now,
+      activeUntilMs:now+90000,
+      updatedAt:serverTimestamp()
+    });
+    return onlineQueueSessionId;
+  },
+  async leaveOnlineQueue(){
+    if(!db||!currentUser)return;
+    try{await deleteDoc(doc(db,"onlineQueue",currentUser.uid));}catch(error){console.warn("キュー削除失敗",error);}
+  },
+  async findOnlineBattlePair(){
+    const user=await this.requireOnlineLogin();
+    const snapshot=await getDocs(collection(db,"onlineQueue"));
+    const now=Date.now();
+    const waiting=snapshot.docs
+      .map(item=>item.data())
+      .filter(item=>item&&item.uid&&item.sessionId&&Number(item.activeUntilMs)>now)
+      .sort((a,b)=>(Number(a.joinedAtMs)||0)-(Number(b.joinedAtMs)||0)||String(a.uid).localeCompare(String(b.uid)));
+
+    const index=waiting.findIndex(item=>item.uid===user.uid && item.sessionId===onlineQueueSessionId);
+    if(index<0)return null;
+    const pairStart=index%2===0?index:index-1;
+    const pair=waiting.slice(pairStart,pairStart+2);
+    if(pair.length<2)return null;
+    if(!pair.some(p=>p.uid===user.uid))return null;
+    return {players:pair};
+  },
+  async ensureOnlineBattleMatch({matchId,players,names,target,cards}){
+    const user=await this.requireOnlineLogin();
+    if(!players.includes(user.uid))throw new Error("対戦情報が不正です。");
+
+    const ref=doc(db,"onlineMatches",matchId);
+
+    // 重要:
+    // 以前は「存在確認のgetDoc → 無ければ作成」という順番だった。
+    // 未作成ドキュメントへのreadはSecurity Rulesで拒否されるため、
+    // 2人がマッチした瞬間に Missing or insufficient permissions が出ていた。
+    //
+    // matchId / cards / target は両クライアントで決定的に同じなので、
+    // 先にsetDocしてから読み取る。片方がcreate、もう片方がupdateになっても
+    // 同じ対戦データなので安全に同期できる。
+    await setDoc(ref,{
+      players,
+      names,
+      target:Math.max(1,Math.round(Number(target)||1)),
+      cards,
+      presence:Object.fromEntries(players.map(uid=>[uid,Date.now()])),
+      createdAtMs:Date.now(),
+      updatedAt:serverTimestamp()
+    },{merge:true});
+
+    const snap=await getDoc(ref);
+    if(!snap.exists())throw new Error("対戦ルームを作成できませんでした。");
+    return snap.data();
+  },
+  async submitOnlineBattleResult(matchId,result){
+    const user=await this.requireOnlineLogin();
+    const matchRef=doc(db,"onlineMatches",matchId);
+
+    let matchSnap;
+    try{
+      matchSnap=await getDoc(matchRef);
+    }catch(error){
+      console.error("Online Battle parent read failed:",error);
+      throw new Error("対戦ルームの確認に失敗しました。Firestoreルールを確認してください。");
+    }
+
+    if(!matchSnap.exists()||!Array.isArray(matchSnap.data().players)||!matchSnap.data().players.includes(user.uid)){
+      throw new Error("対戦ルームが見つかりません。");
+    }
+
+    try{
+      await setDoc(doc(db,"onlineMatches",matchId,"results",user.uid),{
+        uid:user.uid,
+        rounds:Array.isArray(result.rounds)?result.rounds.slice(0,5):[],
+        elapsedMs:Math.min(30000,Math.max(0,Math.round(Number(result.elapsedMs)||0))),
+        timedOut:Boolean(result.timedOut),
+        submittedAt:serverTimestamp()
+      });
+    }catch(error){
+      console.error("Online Battle result write failed:",error);
+      throw new Error("回答結果の保存に失敗しました。Firestoreルールを確認してください。");
+    }
+  },
+  async touchOnlineBattlePresence(matchId){
+    const user=await this.requireOnlineLogin();
+    const matchRef=doc(db,"onlineMatches",matchId);
+    const snap=await getDoc(matchRef);
+    if(!snap.exists()||!Array.isArray(snap.data().players)||!snap.data().players.includes(user.uid)){
+      throw new Error("対戦ルームが見つかりません。");
+    }
+    await setDoc(matchRef,{
+      presence:{
+        ...(snap.data().presence||{}),
+        [user.uid]:Date.now()
+      },
+      updatedAt:serverTimestamp()
+    },{merge:true});
+  },
+  async getOnlineBattleStatus(matchId){
+    const user=await this.requireOnlineLogin();
+    const snap=await getDoc(doc(db,"onlineMatches",matchId));
+    if(!snap.exists()||!Array.isArray(snap.data().players)||!snap.data().players.includes(user.uid)){
+      throw new Error("対戦ルームが見つかりません。");
+    }
+    return snap.data();
+  },
+  async recordOnlineForfeit(matchId,loserUid){
+    const user=await this.requireOnlineLogin();
+    const ref=doc(db,"onlineMatches",matchId);
+    const snap=await getDoc(ref);
+    if(!snap.exists()||!snap.data().players.includes(user.uid)||!snap.data().players.includes(loserUid)){
+      throw new Error("対戦ルームが見つかりません。");
+    }
+    const current=snap.data();
+    if(current.forfeit?.loserUid)return current.forfeit;
+    const forfeit={
+      loserUid,
+      winnerUid:user.uid,
+      decidedAtMs:Date.now(),
+      reason:"disconnect"
+    };
+    await setDoc(ref,{forfeit,updatedAt:serverTimestamp()},{merge:true});
+    return forfeit;
+  },
+  async loadOnlineBattleResults(matchId){
+    const user=await this.requireOnlineLogin();
+    const matchSnap=await getDoc(doc(db,"onlineMatches",matchId));
+    if(!matchSnap.exists()||!matchSnap.data().players.includes(user.uid)){
+      throw new Error("対戦ルームが見つかりません。");
+    }
+    const snapshot=await getDocs(collection(db,"onlineMatches",matchId,"results"));
+    return snapshot.docs.map(item=>item.data());
   },
   async loadLeaderboard(maxEntries=10){
     if(!db)throw new Error("Firestoreが利用できません。");
     const rankingQuery=query(collection(db,"leaderboard"),orderBy("rating","desc"),limit(Math.max(1,Math.min(100,Number(maxEntries)||10))));
     const snapshot=await getDocs(rankingQuery);
     return snapshot.docs.map(item=>({uid:item.id,...item.data()}));
+  },
+  async saveSoloScore({round,hp,lastTarget,rank,rankKey,name}){
+    if(!db)throw new Error("Firestoreが利用できません。");
+    const user=currentUser;
+    if(!user)return false;
+
+    const safeRound=Math.max(0,Math.round(Number(round)||0));
+    const safeHp=Math.max(0,Math.round(Number(hp)||0));
+    const safeTarget=Math.max(0,Math.round(Number(lastTarget)||0));
+    const safeName=String(name||playerNameInput?.value||user.displayName||"Player").trim().slice(0,16)||"Player";
+
+    // round > HP > lastTarget の優先順位を、単一フィールドで安全に並べ替える。
+    // これによりFirestoreの複合インデックス追加が不要。
+    const sortScore=
+      safeRound*1000000000000 +
+      Math.min(safeHp,999)*1000000000 +
+      Math.min(safeTarget,999999999);
+
+    const ref=doc(db,"soloLeaderboard",user.uid);
+    const snap=await getDoc(ref);
+    const old=snap.exists()?snap.data():null;
+    const oldScore=Math.max(0,Number(old?.sortScore)||0);
+
+    if(!old || sortScore>oldScore){
+      await setDoc(ref,{
+        uid:user.uid,
+        displayName:safeName,
+        round:safeRound,
+        hp:safeHp,
+        lastTarget:safeTarget,
+        rank:String(rank||""),
+        rankKey:String(rankKey||""),
+        sortScore,
+        updatedAt:serverTimestamp()
+      },{merge:true});
+      return true;
+    }
+
+    // ベスト記録が更新されなくてもプレイヤー名だけは最新に保つ。
+    if(old && safeName && old.displayName!==safeName){
+      await setDoc(ref,{
+        displayName:safeName,
+        updatedAt:serverTimestamp()
+      },{merge:true});
+    }
+    return false;
+  },
+  async loadSoloLeaderboard(maxEntries=10){
+    if(!db)throw new Error("Firestoreが利用できません。");
+    const count=Math.max(1,Math.min(100,Number(maxEntries)||10));
+    const q=query(
+      collection(db,"soloLeaderboard"),
+      orderBy("sortScore","desc"),
+      limit(count)
+    );
+    const snapshot=await getDocs(q);
+    return snapshot.docs.map(item=>({uid:item.id,...item.data()}));
   }
 };
 </script>
+
+
+
+
+<style>
+/* Title screen v4: first-time-player readability */
+@media (max-width: 600px){
+  .title-description,.game-description,.subtitle{font-size:15px!important;line-height:1.6!important}
+  .rules,.rule-list,.instructions,.how-to-play{font-size:14px!important;line-height:1.55!important}
+}
+</style>
+
+
+<style>
+.account-record-hint{
+  margin:6px auto 0;
+  max-width:430px;
+  text-align:center;
+  font-size:11px;
+  line-height:1.45;
+  color:#7a879d;
+}
+@media(max-width:600px){
+  .account-record-hint{
+    margin-top:6px;
+    padding:0 8px;
+    font-size:12px;
+    line-height:1.5;
+  }
+}
+</style>
+
+
+<style id="v15-safe-play-layout">
+/* Rebuilt from stable v10: game UI uses only MAIN + RIGHT SIDEBAR on desktop. */
+@media (min-width:981px){
+  #gameScreen .game-layout{
+    grid-template-columns:minmax(0,1fr) 270px !important;
+  }
+}
+
+/* Compact rarity chart; never occupies the top/full-width area. */
+.rarity-pie-section{
+  padding-bottom:15px;
+  margin-bottom:15px;
+  border-bottom:1px solid var(--border);
+}
+.rarity-pie-section h2{
+  margin:0 0 4px;
+}
+.rarity-pie-compact-wrap{
+  display:flex;
+  justify-content:center;
+  padding:8px 0 10px;
+}
+.rarity-pie-compact{
+  width:116px;
+  aspect-ratio:1;
+  border-radius:50%;
+  position:relative;
+  background:conic-gradient(
+    #f267c8 0% 1%,
+    #69d8ee 1% 3%,
+    #f4d45f 3% 6%,
+    #f2a331 6% 11%,
+    #b64edb 11% 18%,
+    #7a63e8 18% 28%,
+    #4e8fe0 28% 40%,
+    #60ad77 40% 55%,
+    #9ca4ae 55% 75%,
+    #81705f 75% 100%
+  );
+}
+.rarity-pie-compact::after{
+  content:"";
+  position:absolute;
+  inset:31%;
+  border-radius:50%;
+  background:var(--panel);
+  border:1px solid var(--border);
+}
+.rarity-pie-center{
+  position:absolute;
+  inset:31%;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.rarity-pie-center strong{
+  font-size:13px;
+}
+.rarity-pie-list{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:3px;
+}
+.rarity-pie-list>div{
+  display:grid;
+  grid-template-columns:8px 1fr auto;
+  align-items:center;
+  gap:6px;
+  font-size:10px;
+  line-height:1.25;
+}
+.rarity-pie-list i{
+  width:7px;
+  height:7px;
+  border-radius:2px;
+}
+.rarity-pie-list strong{
+  font-size:10px;
+}
+.rp-mythic{background:#f267c8}.rp-celestial{background:#69d8ee}
+.rp-divine{background:#f4d45f}.rp-legendary{background:#f2a331}
+.rp-epic{background:#b64edb}.rp-heroic{background:#7a63e8}
+.rp-rare{background:#4e8fe0}.rp-uncommon{background:#60ad77}
+.rp-common{background:#9ca4ae}.rp-junk{background:#81705f}
+
+/* On phone/tablet, keep it in the information area below the playable main area. */
+@media(max-width:980px){
+  .rarity-pie-section{
+    display:none;
+  }
+}
+</style>
+
+
+<style id="online-battle-button-fix-v2">
+#onlineModeButton{
+  pointer-events:auto !important;
+  cursor:pointer !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+#onlineModeButton:disabled{
+  pointer-events:auto !important;
+  cursor:pointer !important;
+  opacity:1 !important;
+}
+#onlineModeButton.selected{
+  border-color:#7ca7ff !important;
+  box-shadow:0 0 0 1px rgba(124,167,255,.35) inset !important;
+}
+</style>
+
+
+<style id="online-result-time-v8">
+.online-battle-stats-time-only{
+  grid-template-columns:1fr !important;
+}
+.online-result-time{
+  margin-top:6px;
+  padding-top:6px;
+  border-top:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  color:var(--muted);
+  font-size:12px !important;
+}
+.online-result-time strong{
+  font-size:13px !important;
+  color:var(--text);
+}
+</style>
+
+
+<style id="online-five-rounds-v10">
+.online-battle-stats-five-rounds{grid-template-columns:1fr 1fr!important}
+.online-round-results{display:grid;gap:5px;margin-top:10px}
+.online-round-results>div{
+  display:grid;
+  grid-template-columns:34px 1fr 52px 1fr;
+  align-items:center;
+  gap:8px;
+  padding:7px 9px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  font-size:12px;
+}
+.online-round-results>div>span:last-child{text-align:right}
+.online-round-results b{text-align:center;font-size:10px}
+.online-round-results small{color:var(--muted)}
+@media(max-width:600px){
+  .online-round-results>div{grid-template-columns:28px 1fr 44px 1fr;gap:5px;padding:6px}
+}
+</style>
+
+
+<style id="online-optimal-points-v12">
+.online-point-row{
+  display:grid !important;
+  grid-template-columns:34px minmax(0,1fr) 30px minmax(0,1fr) !important;
+  align-items:center;
+  gap:8px !important;
+}
+.online-point-answer{
+  display:grid;
+  gap:2px;
+}
+.online-point-answer.opponent{
+  text-align:right;
+}
+.online-point-answer b{
+  font-size:14px;
+}
+.online-point-answer small{
+  color:var(--muted);
+  font-size:10px;
+  white-space:normal;
+}
+.online-point-vs{
+  text-align:center;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:900;
+}
+@media(max-width:600px){
+  .online-point-row{
+    grid-template-columns:26px minmax(0,1fr) 22px minmax(0,1fr) !important;
+    gap:5px !important;
+  }
+  .online-point-answer b{font-size:13px}
+  .online-point-answer small{font-size:9px}
+}
+</style>
+
+
+<style id="online-result-chart-v13">
+.online-result-chart-wrap{
+  margin-top:12px;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#0b1422;
+}
+.online-result-chart-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:5px;
+  color:var(--muted);
+  font-size:10px;
+}
+.online-result-chart{
+  display:block;
+  width:100%;
+  height:auto;
+  min-height:220px;
+}
+.online-round-results{display:none!important}
+@media(max-width:600px){
+  .online-result-chart-head{
+    flex-direction:column;
+    gap:2px;
+  }
+  .online-result-chart{
+    min-height:180px;
+  }
+}
+</style>
+
+
+<style id="online-chart-detail-v14">
+.online-result-chart-stage{
+  position:relative;
+}
+.online-chart-point,
+.online-chart-hit{
+  cursor:pointer;
+  outline:none;
+}
+.online-chart-point:focus,
+.online-chart-hit:focus{
+  stroke:#ffffff;
+  stroke-width:2;
+}
+.online-chart-tooltip{
+  position:absolute;
+  z-index:10;
+  width:220px;
+  padding:10px 11px;
+  border:1px solid #40516d;
+  border-radius:10px;
+  background:#0f1827;
+  box-shadow:0 10px 28px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+.online-chart-tooltip.hidden{display:none}
+.online-chart-tooltip-title{
+  margin-bottom:7px;
+  font-size:12px;
+  font-weight:900;
+  color:#eef4ff;
+}
+.online-chart-tooltip-grid{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:5px 10px;
+  align-items:start;
+  font-size:10px;
+}
+.online-chart-tooltip-grid span{
+  color:var(--muted);
+}
+.online-chart-tooltip-grid strong{
+  color:var(--text);
+  font-size:10px;
+  overflow-wrap:anywhere;
+}
+@media(max-width:600px){
+  .online-chart-tooltip{
+    width:190px;
+    padding:9px;
+  }
+  .online-chart-tooltip-grid{
+    font-size:9px;
+    gap:4px 8px;
+  }
+}
+</style>
+
+
+<style id="online-optimal-point-animation-v16">
+.online-optimal-pulse{
+  transform-box:fill-box;
+  transform-origin:center;
+  pointer-events:none;
+  animation:onlineOptimalPulse 1.35s ease-out infinite;
+}
+.online-optimal-ring{
+  transform-box:fill-box;
+  transform-origin:center;
+  pointer-events:none;
+  opacity:.75;
+  animation:onlineOptimalRing 1.35s ease-in-out infinite alternate;
+}
+.online-chart-point.is-optimal{
+  filter:drop-shadow(0 0 4px currentColor);
+}
+@keyframes onlineOptimalPulse{
+  0%{transform:scale(.75);opacity:.95}
+  70%{transform:scale(1.75);opacity:.12}
+  100%{transform:scale(1.95);opacity:0}
+}
+@keyframes onlineOptimalRing{
+  from{transform:scale(.92);opacity:.45}
+  to{transform:scale(1.12);opacity:1}
+}
+@media (prefers-reduced-motion: reduce){
+  .online-optimal-pulse,.online-optimal-ring{animation:none}
+}
+</style>
 
 </body>
 </html>
