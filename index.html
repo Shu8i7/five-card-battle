@@ -1291,6 +1291,7 @@ button.warn{background:#4a3918;border-color:#886e31}
   <button id="onlineModeButton" class="mode-card" type="button">
     <span class="mode-title">Online Battle</span>
     <span class="mode-desc">Googleログイン必須。同じ手札・同じ目標で1vs1対戦</span>
+    <span id="onlineWaitingCount" class="online-waiting-count">待機中 0人</span>
     <span class="mode-status">1 VS 1</span>
   </button>
 </div>
@@ -1474,6 +1475,32 @@ button.warn{background:#4a3918;border-color:#886e31}
   </section>
 
   <section id="onlineBattleScreen" class="online-battle-screen hidden">
+    <div id="onlineSyncOverlay" data-build="v35" class="online-sync-overlay hidden" aria-live="assertive">
+      <div class="online-sync-card">
+        <small>ONLINE BATTLE</small>
+
+        <div class="online-sync-versus">
+          <div class="online-sync-player">
+            <span class="online-sync-side">YOU</span>
+            <strong id="onlineSyncYouName">—</strong>
+            <span id="onlineSyncYouRate">—</span>
+            <b id="onlineSyncYouRP">—</b>
+          </div>
+
+          <div class="online-sync-vs">VS</div>
+
+          <div class="online-sync-player">
+            <span class="online-sync-side">OPPONENT</span>
+            <strong id="onlineSyncOpponentName">—</strong>
+            <span id="onlineSyncOpponentRate">—</span>
+            <b id="onlineSyncOpponentRP">—</b>
+          </div>
+        </div>
+
+        <strong id="onlineSyncCount">READY</strong>
+        <span id="onlineSyncText">開始時刻を同期しています...</span>
+      </div>
+    </div>
     <div class="online-battle-shell">
       <div class="online-battle-head">
         <div>
@@ -2872,7 +2899,11 @@ const onlineBattleState={
   challenges:[],
   finishedAtMs:0,
   presenceId:null,
-  forfeitHandled:false
+  forfeitHandled:false,
+  syncId:null,
+  startAtMs:0,
+  gameStarted:false,
+  myQueueProfile:null
 };
 
 function onlineHashSeed(str){
@@ -2988,39 +3019,104 @@ function createOnlineChallenge(matchId){
 function onlineExpectedType(){
   return onlineBattleState.chosen.length%2===0?"number":"operator";
 }
+
+function onlineIsBattleActive(){
+  if(onlineBattleState.submitted)return false;
+  const now=Date.now();
+  const start=Number(onlineBattleState.startAtMs)||0;
+
+  // Primary signal.
+  if(onlineBattleState.gameStarted)return true;
+
+  // Recovery signal: shared match clock says the battle has started even if
+  // the local countdown callback was delayed or skipped.
+  if(start>0 && now>=start && now<start+30000){
+    onlineBattleState.gameStarted=true;
+    $("onlineSyncOverlay")?.classList.add("hidden");
+    return true;
+  }
+
+  return false;
+}
 function onlineExpressionText(){
   return onlineBattleState.chosen.map(c=>c.label).join("");
 }
-function onlineRender(){
-  const cardsBox=$("onlineCards");
-  if(!cardsBox)return;
-  cardsBox.innerHTML="";
-  onlineBattleState.cards.forEach(card=>{
-    const b=document.createElement("button");
-    b.type="button";
-    b.className="cardbtn";
-    if(onlineBattleState.chosen.some(c=>c.id===card.id))b.classList.add("online-card-used");
-    b.disabled=onlineBattleState.submitted||onlineBattleState.chosen.some(c=>c.id===card.id);
-    const top=document.createElement("span");
-    top.className="cardtype";
-    top.textContent=card.type==="number"?"NUMBER":"OPERATOR";
-    const foot=document.createElement("span");
-    foot.className="cardfoot";
-    foot.textContent=card.name;
-    b.append(top,document.createTextNode(card.label),foot);
-    b.addEventListener("click",()=>onlineChooseCard(card.id));
-    cardsBox.appendChild(b);
-  });
-  $("onlineExpression").textContent=onlineBattleState.chosen.length?onlineExpressionText():"カードを順番に選択";
-  $("onlineSubmit").disabled=onlineBattleState.submitted||onlineBattleState.chosen.length!==5;
-  $("onlineUndo").disabled=onlineBattleState.submitted||onlineBattleState.chosen.length===0;
+const onlineCardsElement=$("onlineCards");
+onlineCardsElement?.addEventListener("click",event=>{
+  const button=event.target.closest(".cardbtn");
+  if(!button||button.disabled||!onlineCardsElement.contains(button))return;
+  onlineChooseCard(button.dataset.cardId);
+});
+
+function onlineUpdateBattleStatus(){
+  const battleActive=onlineIsBattleActive();
+  $("onlineSubmit").disabled=!battleActive||onlineBattleState.submitted||onlineBattleState.chosen.length!==5;
+  $("onlineUndo").disabled=!battleActive||onlineBattleState.submitted||onlineBattleState.chosen.length===0;
   $("onlineTime").textContent=Math.max(0,onlineBattleState.timeLeft);
   $("onlineRound").textContent=`${Math.min(5,onlineBattleState.roundIndex+1)} / 5`;
 }
+
+function onlineRender(){
+  const cardsBox=$("onlineCards");
+  if(!cardsBox)return;
+
+  // Rebuild card nodes only when the actual card/chosen/submitted state changes.
+  // The 100ms battle timer must never destroy buttons under the mouse pointer.
+  const renderKey=JSON.stringify({
+    cards:onlineBattleState.cards.map(c=>c.id),
+    chosen:onlineBattleState.chosen.map(c=>c.id),
+    submitted:onlineBattleState.submitted,
+    round:onlineBattleState.roundIndex
+  });
+
+  if(cardsBox.dataset.renderKey!==renderKey){
+    cardsBox.dataset.renderKey=renderKey;
+    cardsBox.innerHTML="";
+
+    onlineBattleState.cards.forEach(card=>{
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="cardbtn";
+      b.dataset.cardId=String(card.id);
+
+      const used=onlineBattleState.chosen.some(c=>c.id===card.id);
+      if(used)b.classList.add("online-card-used");
+      b.disabled=onlineBattleState.submitted||used;
+
+      const top=document.createElement("span");
+      top.className="cardtype";
+      top.textContent=card.type==="number"?"NUMBER":"OPERATOR";
+
+      const foot=document.createElement("span");
+      foot.className="cardfoot";
+      foot.textContent=card.name;
+
+      b.append(top,document.createTextNode(card.label),foot);
+      cardsBox.appendChild(b);
+    });
+  }
+
+  // Enable/disable existing nodes without replacing them.
+  const battleActive=onlineIsBattleActive();
+  cardsBox.querySelectorAll(".cardbtn").forEach(b=>{
+    const id=b.dataset.cardId;
+    const used=onlineBattleState.chosen.some(c=>String(c.id)===id);
+    b.disabled=!battleActive||onlineBattleState.submitted||used;
+    b.classList.toggle("online-card-used",used);
+  });
+
+  $("onlineExpression").textContent=onlineBattleState.chosen.length?onlineExpressionText():"カードを順番に選択";
+  onlineUpdateBattleStatus();
+}
 function onlineChooseCard(id){
+  if(!onlineIsBattleActive()){
+    $("onlineBattleMessage").className="message bad";
+    $("onlineBattleMessage").textContent="対戦開始時刻を同期中です。";
+    return;
+  }
   if(onlineBattleState.submitted)return;
-  const card=onlineBattleState.cards.find(c=>c.id===id);
-  if(!card||onlineBattleState.chosen.some(c=>c.id===id))return;
+  const card=onlineBattleState.cards.find(c=>String(c.id)===String(id));
+  if(!card||onlineBattleState.chosen.some(c=>String(c.id)===String(id)))return;
   const expected=onlineExpectedType();
   if(card.type!==expected){
     $("onlineBattleMessage").className="message bad";
@@ -3032,6 +3128,7 @@ function onlineChooseCard(id){
   onlineRender();
 }
 function onlineUndo(){
+  if(!onlineIsBattleActive())return;
   if(onlineBattleState.submitted)return;
   onlineBattleState.chosen.pop();
   playSound("undo");
@@ -3365,6 +3462,7 @@ function renderOnlineResultChart({me,opponent,myDetails,opDetails,myScore,opScor
   },{once:true});
 }
 function onlineShowResult(me,opponent){
+  onlineStopSync();
   onlineStopPresence();
   $("onlineResultChart")?.classList.remove("hidden");
   const pair=[me,opponent].slice().sort((x,y)=>String(x.uid||"").localeCompare(String(y.uid||"")));
@@ -3405,6 +3503,7 @@ function onlineShowResult(me,opponent){
   else if(compare.winnerUid)playSound("damage",5);
 }
 async function onlineSubmitAnswer(autoTimeout=false){
+  if(!autoTimeout&&!onlineIsBattleActive())return;
   if(onlineBattleState.submitted)return;
 
   // A global 30-second timer covers all five questions.
@@ -3506,6 +3605,7 @@ function onlineStopPresence(){
   onlineBattleState.presenceId=null;
 }
 function onlineShowForfeitResult(iWon){
+  onlineStopSync();
   clearInterval(onlineBattleState.timerId);
   clearInterval(onlineBattleState.pollId);
   onlineStopPresence();
@@ -3592,18 +3692,172 @@ function onlineFormatValue(result){
 }
 
 
+
+function onlineStopSync(){
+  clearInterval(onlineBattleState.syncId);
+  onlineBattleState.syncId=null;
+}
+
+function onlineStartGameTimerFromSharedClock(){
+  // Always repair the UI/timer from the shared start clock.
+  // Do not return merely because gameStarted was set by a delayed input/render.
+  onlineBattleState.gameStarted=true;
+  onlineStopSync();
+
+  $("onlineSyncOverlay")?.classList.add("hidden");
+  $("onlineYouStatus").textContent="考え中...";
+  $("onlineOpponentStatus").textContent="考え中...";
+  $("onlineBattleMessage").className="message";
+  $("onlineBattleMessage").textContent="START！30秒以内に5問へ回答してください。";
+
+  // Every client uses the exact same shared Firestore start time.
+  onlineBattleState.startedAtMs=onlineBattleState.startAtMs;
+  onlineBattleState.timeLeft=Math.max(0,Math.ceil((onlineBattleState.startAtMs+30000-Date.now())/1000));
+  onlineRender();
+
+  clearInterval(onlineBattleState.timerId);
+  onlineBattleState.timerId=setInterval(()=>{
+    if(onlineBattleState.submitted)return;
+    const remainingMs=onlineBattleState.startAtMs+30000-Date.now();
+    onlineBattleState.timeLeft=Math.max(0,Math.ceil(remainingMs/1000));
+    if(remainingMs<=5000&&remainingMs>4000)playSound("tick");
+    onlineUpdateBattleStatus();
+    if(remainingMs<=0){
+      clearInterval(onlineBattleState.timerId);
+      onlineBattleState.timeLeft=0;
+      onlineRender();
+      onlineSubmitAnswer(true);
+    }
+  },100);
+}
+
+async function onlineLoadCountdownProfiles(){
+  const myUser=onlineBattleState.user;
+  const me=onlineBattleState.myQueueProfile||{};
+  const opponent=onlineBattleState.opponent||{};
+
+  const account=window.firebaseBridge?.getAccountDisplayProfile?.()||{};
+  const fallbackMyName=String(account.name||$("playerName")?.value||myUser?.displayName||"Player").trim();
+  const fallbackMyRate=String(account.rateLabel||"").trim();
+  const fallbackMyRating=Number(account.rating);
+
+  const myRating=Number(me.rating);
+  const opponentRating=Number(opponent.rating);
+
+  $("onlineSyncYouName").textContent=String(me.name||fallbackMyName||"Player").slice(0,16);
+
+  if(Number.isFinite(myRating)){
+    const r=Math.max(0,Math.round(myRating));
+    $("onlineSyncYouRate").textContent=String(me.rateLabel||fallbackMyRate||ratingLabel(r));
+    $("onlineSyncYouRP").textContent=`${r} RP`;
+  }else if(Number.isFinite(fallbackMyRating)){
+    const r=Math.max(0,Math.round(fallbackMyRating));
+    $("onlineSyncYouRate").textContent=fallbackMyRate||ratingLabel(r);
+    $("onlineSyncYouRP").textContent=`${r} RP`;
+  }else{
+    $("onlineSyncYouRate").textContent="—";
+    $("onlineSyncYouRP").textContent="—";
+  }
+
+  $("onlineSyncOpponentName").textContent=String(opponent.name||"Opponent").slice(0,16);
+  if(Number.isFinite(opponentRating)){
+    const r=Math.max(0,Math.round(opponentRating));
+    $("onlineSyncOpponentRate").textContent=String(opponent.rateLabel||ratingLabel(r));
+    $("onlineSyncOpponentRP").textContent=`${r} RP`;
+  }else{
+    $("onlineSyncOpponentRate").textContent="—";
+    $("onlineSyncOpponentRP").textContent="—";
+  }
+
+  console.info("v35 countdown profile",{
+    you:{queue:me,account},
+    opponent
+  });
+}
+
+async function onlineWaitForSynchronizedStart(matchData){
+  onlineStopSync();
+
+  const overlay=$("onlineSyncOverlay");
+  const countEl=$("onlineSyncCount");
+  const textEl=$("onlineSyncText");
+
+  overlay?.classList.remove("hidden");
+  countEl.textContent="READY";
+  textEl.textContent="開始時刻を同期しています...";
+
+  // Rating/name are already present in the matched queue pair, so this is immediate.
+  onlineLoadCountdownProfiles().catch(error=>console.warn("プロフィール表示エラー",error));
+  $("onlineYouStatus").textContent="準備完了";
+  $("onlineOpponentStatus").textContent="準備完了";
+  onlineBattleState.gameStarted=false;
+
+  // createdAt is a Firestore serverTimestamp. Both clients therefore receive
+  // the same absolute epoch time, independent of PC/phone rendering delay.
+  let createdAtMs=0;
+  if(matchData?.createdAt?.toMillis){
+    createdAtMs=matchData.createdAt.toMillis();
+  }else if(matchData?.createdAt?.seconds){
+    createdAtMs=Number(matchData.createdAt.seconds)*1000+
+      Math.floor(Number(matchData.createdAt.nanoseconds||0)/1e6);
+  }
+
+  // Extremely defensive fallback; normal Firestore reads use createdAt.
+  if(!createdAtMs)createdAtMs=Number(matchData?.createdAtMs)||Date.now();
+
+  // Give both devices 5 seconds after the server-created room timestamp.
+  // If a slow device arrives late, start immediately using the same deadline.
+  onlineBattleState.startAtMs=createdAtMs+5000;
+
+  const updateCountdown=()=>{
+    if(onlineBattleState.gameStarted||onlineBattleState.forfeitHandled)return;
+
+    const diff=onlineBattleState.startAtMs-Date.now();
+    if(diff<=0){
+      countEl.textContent="START!";
+      textEl.textContent="対戦開始";
+      onlineStartGameTimerFromSharedClock();
+      return;
+    }
+
+    countEl.textContent=String(Math.max(1,Math.ceil(diff/1000)));
+    textEl.textContent="対戦開始を同期中";
+  };
+
+  updateCountdown();
+  onlineBattleState.syncId=setInterval(updateCountdown,50);
+
+  // Safety: if a browser throttles the countdown interval, force one clock check
+  // shortly after the shared start time.
+  const safetyDelay=Math.max(0,onlineBattleState.startAtMs-Date.now()+120);
+  setTimeout(()=>{
+    if(!onlineBattleState.submitted && Date.now()>=onlineBattleState.startAtMs){
+      onlineStartGameTimerFromSharedClock();
+    }
+  },safetyDelay);
+}
+
 async function onlineBeginMatch(pair){
   onlineBattleState.matching=false;
   clearInterval(onlineBattleState.pollId);
 
   const myUser=window.firebaseBridge.getUser();
+  const myQueueProfile=pair.players.find(p=>p.uid===myUser.uid)||null;
   const opponent=pair.players.find(p=>p.uid!==myUser.uid);
+  onlineBattleState.myQueueProfile=myQueueProfile;
+
+  if(myQueueProfile && !Number.isFinite(Number(myQueueProfile.rating))){
+    console.warn("自分の待機データにratingがありません。",myQueueProfile);
+  }
+  if(opponent && !Number.isFinite(Number(opponent.rating))){
+    console.warn("相手の待機データにratingがありません。",opponent);
+  }
   const ids=pair.players.map(p=>p.sessionId).sort();
   const matchId="m_"+ids.join("_");
   const challenges=Array.from({length:5},(_,i)=>createOnlineChallenge(`${matchId}_q${i+1}`));
   const challenge=challenges[0];
 
-  await window.firebaseBridge.ensureOnlineBattleMatch({
+  const matchData=await window.firebaseBridge.ensureOnlineBattleMatch({
     matchId,
     players:pair.players.map(p=>p.uid),
     names:Object.fromEntries(pair.players.map(p=>[p.uid,p.name])),
@@ -3627,7 +3881,9 @@ async function onlineBeginMatch(pair){
   onlineBattleState.chosen=[];
   onlineBattleState.target=challenge.target;
   onlineBattleState.timeLeft=30;
-  onlineBattleState.startedAtMs=Date.now();
+  onlineBattleState.startedAtMs=0;
+  onlineBattleState.startAtMs=0;
+  onlineBattleState.gameStarted=false;
   onlineBattleState.submitted=false;
   onlineBattleState.result=null;
   onlineBattleState.forfeitHandled=false;
@@ -3638,30 +3894,19 @@ async function onlineBeginMatch(pair){
   $("onlineBattleScreen").classList.remove("hidden");
   $("onlineYouName").textContent=$("playerName").value.trim()||myUser.displayName||"Player";
   $("onlineOpponentName").textContent=opponent?.name||"Opponent";
-  $("onlineYouStatus").textContent="考え中...";
-  $("onlineOpponentStatus").textContent="考え中...";
+  $("onlineYouStatus").textContent="準備中...";
+  $("onlineOpponentStatus").textContent="準備中...";
   $("onlineResultPanel").classList.add("hidden");
   $("onlineExitButton")?.classList.add("hidden");
   $("onlineBattleMessage").className="message";
-  $("onlineBattleMessage").textContent="対戦開始！30秒以内に回答してください。";
+  $("onlineBattleMessage").textContent="対戦相手と開始時刻を同期しています...";
   onlineRender();
   onlineStartPresence();
 
   // Give the opponent enough time to detect the same queue pair, then remove own queue entry.
   setTimeout(()=>window.firebaseBridge?.leaveOnlineQueue().catch(()=>{}),5000);
 
-  clearInterval(onlineBattleState.timerId);
-  onlineBattleState.timerId=setInterval(()=>{
-    if(onlineBattleState.submitted)return;
-    onlineBattleState.timeLeft--;
-    if(onlineBattleState.timeLeft<=5&&onlineBattleState.timeLeft>0)playSound("tick");
-    onlineRender();
-    if(onlineBattleState.timeLeft<=0){
-      onlineBattleState.timeLeft=0;
-      onlineRender();
-      onlineSubmitAnswer(true);
-    }
-  },1000);
+  await onlineWaitForSynchronizedStart(matchData);
 }
 async function onlinePollMatch(){
   if(!onlineBattleState.matching)return;
@@ -3746,6 +3991,7 @@ setTimeout(onlineRecoverDisconnectedMatch,1500);
 setTimeout(onlineRecoverDisconnectedMatch,3500);
 
 function onlineReturnToTitle(){
+  onlineStopSync();
   onlineStopPresence();
   clearInterval(onlineBattleState.timerId);
   clearInterval(onlineBattleState.pollId);
@@ -3821,6 +4067,33 @@ googleLogoutButton?.addEventListener("click",async()=>{
   try{await window.firebaseBridge?.signOut();}
   catch(error){alert(error?.message||"ログアウトに失敗しました。");}
 });
+let onlineWaitingCountTimer=null;
+
+async function refreshOnlineWaitingCount(){
+  const el=$("onlineWaitingCount");
+  if(!el)return;
+  try{
+    if(!window.firebaseBridge?.getUser?.()){
+      el.textContent="待機中 0人";
+      return;
+    }
+    const count=await window.firebaseBridge.countOnlineWaitingPlayers();
+    el.textContent=`待機中 ${Number(count)||0}人`;
+  }catch(error){
+    console.warn("待機人数取得エラー",error);
+    el.textContent="待機中 —人";
+  }
+}
+
+function startOnlineWaitingCountRefresh(){
+  clearInterval(onlineWaitingCountTimer);
+  refreshOnlineWaitingCount();
+  onlineWaitingCountTimer=setInterval(()=>{
+    if(!$("startScreen")?.classList.contains("hidden"))refreshOnlineWaitingCount();
+  },2000);
+}
+setTimeout(startOnlineWaitingCountRefresh,500);
+
 function selectMode(mode){
   selectedGameMode=mode;
   soloModeButton.classList.toggle("selected",mode==="solo");
@@ -3970,7 +4243,7 @@ Never grant permanent rarity multipliers.
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
 const statusEl=document.getElementById("authStatus");
 const accountButton=document.getElementById("googleAccountButton");
@@ -4121,6 +4394,46 @@ async function savePlayerNameForCurrentUser(){
   accountMenuName.textContent=safeName;
 }
 
+function firestoreTimestampMs(value){
+  if(!value)return 0;
+  if(typeof value.toMillis==="function")return value.toMillis();
+  if(Number.isFinite(Number(value.seconds))){
+    return Number(value.seconds)*1000+Math.floor(Number(value.nanoseconds||0)/1e6);
+  }
+  return 0;
+}
+
+async function loadCanonicalRankProfile(user){
+  if(!db||!user)return null;
+
+  // Rating / RP authority = leaderboard/{uid}.
+  // This is the same document that stores the ranked value shown in Firebase.
+  const leaderSnap=await getDoc(doc(db,"leaderboard",user.uid));
+  if(leaderSnap.exists()){
+    const data=leaderSnap.data();
+    return {
+      ...data,
+      uid:user.uid,
+      rating:Math.max(0,Math.round(Number(data.rating)||100)),
+      displayName:String(data.displayName||user.displayName||"Player").slice(0,16)
+    };
+  }
+
+  // Only fall back to users when the leaderboard document truly does not exist.
+  const userSnap=await getDoc(doc(db,"users",user.uid));
+  if(userSnap.exists()){
+    const data=userSnap.data();
+    return {
+      ...data,
+      uid:user.uid,
+      rating:Math.max(0,Math.round(Number(data.rating)||100)),
+      displayName:String(data.displayName||user.displayName||"Player").slice(0,16)
+    };
+  }
+
+  return await ensureProfileDocument(user);
+}
+
 async function ensureProfileDocument(user){
   if(!db||!user)return null;
   const ref=doc(db,"users",user.uid);
@@ -4153,7 +4466,8 @@ if(configured){
     updateAuthUI(user);
     if(user){
       try{
-        const profile=await ensureProfileDocument(user);
+        await ensureProfileDocument(user);
+        const profile=await loadCanonicalRankProfile(user);
         await applySavedProfileToUI(user,profile);
       }
       catch(error){
@@ -4177,6 +4491,13 @@ if(playerNameInput){
 window.firebaseBridge={
   isConfigured:()=>configured,
   getUser:()=>currentUser,
+  getAccountDisplayProfile:()=>({
+    uid:currentUser?.uid||"",
+    name:String(accountMenuName?.textContent||playerNameInput?.value||currentUser?.displayName||"Player").trim().slice(0,16),
+    rateLabel:String(accountRate?.textContent||"").trim(),
+    rpText:String(accountRP?.textContent||"").trim(),
+    rating:Number(String(accountRP?.textContent||"").replace(/[^\d-]/g,""))
+  }),
   async signIn(forceAccountSelection=false){
     if(!configured)throw new Error("Firebaseが未設定です。firebase-config.jsを設定してください。");
     const provider=new GoogleAuthProvider();
@@ -4184,7 +4505,8 @@ window.firebaseBridge={
     const result=await signInWithPopup(auth,provider);
     currentUser=result.user;
     updateAuthUI(currentUser);
-    const profile=await ensureProfileDocument(currentUser);
+    await ensureProfileDocument(currentUser);
+    const profile=await loadCanonicalRankProfile(currentUser);
     await applySavedProfileToUI(currentUser,profile);
     return currentUser;
   },
@@ -4205,7 +4527,7 @@ window.firebaseBridge={
   },
   async loadRankProfile(){
     const user=await this.requireRankLogin();
-    return await ensureProfileDocument(user);
+    return await loadCanonicalRankProfile(user);
   },
   async saveRankProfile({rating,displayName}){
     const user=await this.requireRankLogin();
@@ -4242,22 +4564,96 @@ window.firebaseBridge={
   },
   async joinOnlineQueue(displayName){
     const user=await this.requireOnlineLogin();
-    const safeName=String(displayName||user.displayName||"Player").trim().slice(0,16)||"Player";
+
+    let name=String(accountMenuName?.textContent||displayName||user.displayName||"Player")
+      .trim().slice(0,16)||"Player";
+    let rateLabelText=String(accountRate?.textContent||"").trim();
+    let rating=Number(String(accountRP?.textContent||"").replace(/[^\d-]/g,""));
+
+    // If the account UI has not finished populating yet, use the same profile loader
+    // that populates the title account menu, then update the UI before queueing.
+    if(!Number.isFinite(rating)||!rateLabelText||!name||name==="Player"){
+      try{
+        const profile=await loadCanonicalRankProfile(user);
+        if(profile){
+          await applySavedProfileToUI(user,profile);
+          name=String(profile.displayName||accountMenuName?.textContent||displayName||user.displayName||"Player")
+            .trim().slice(0,16)||"Player";
+          rating=Math.max(0,Math.round(Number(profile.rating)||100));
+          rateLabelText=ratingLabel(rating);
+        }
+      }catch(error){
+        console.warn("Online Battle account profile preparation failed",error);
+      }
+    }
+
+    if(!Number.isFinite(rating))rating=100;
+    rating=Math.max(0,Math.round(rating));
+    if(!rateLabelText)rateLabelText=ratingLabel(rating);
+
     onlineQueueSessionId=`${Date.now().toString(36)}${Math.random().toString(36).slice(2,9)}`;
     const now=Date.now();
+
     await setDoc(doc(db,"onlineQueue",user.uid),{
       uid:user.uid,
-      name:safeName,
+      name,
+      rating,
+      rateLabel:rateLabelText,
       sessionId:onlineQueueSessionId,
       joinedAtMs:now,
       activeUntilMs:now+90000,
       updatedAt:serverTimestamp()
     });
+
+    console.info("v35 queue profile",{
+      uid:user.uid,name,rating,rateLabel:rateLabelText,
+      accountUI:{
+        name:accountMenuName?.textContent,
+        rate:accountRate?.textContent,
+        rp:accountRP?.textContent
+      }
+    });
+
     return onlineQueueSessionId;
   },
   async leaveOnlineQueue(){
     if(!db||!currentUser)return;
     try{await deleteDoc(doc(db,"onlineQueue",currentUser.uid));}catch(error){console.warn("キュー削除失敗",error);}
+  },
+  async loadOwnOnlineBattleProfile(){
+    const user=await this.requireOnlineLogin();
+    return await loadCanonicalRankProfile(user);
+  },
+  async loadLeaderboardProfile(uid){
+    if(!db||!uid)return null;
+    const snap=await getDoc(doc(db,"leaderboard",uid));
+    return snap.exists()?snap.data():null;
+  },
+  async loadOnlineBattleProfiles(uids){
+    if(!db)return {};
+    const ids=[...new Set((uids||[]).filter(Boolean))];
+
+    const readOne=async uid=>{
+      try{
+        const read=getDoc(doc(db,"leaderboard",uid));
+        const timeout=new Promise(resolve=>setTimeout(()=>resolve(null),1200));
+        const snap=await Promise.race([read,timeout]);
+        if(snap?.exists?.())return [uid,snap.data()];
+      }catch(error){
+        console.warn("Online Battleプロフィール取得失敗",uid,error);
+      }
+      return [uid,null];
+    };
+
+    return Object.fromEntries(await Promise.all(ids.map(readOne)));
+  },
+  async countOnlineWaitingPlayers(){
+    const snapshot=await getDocs(collection(db,"onlineQueue"));
+    const now=Date.now();
+    return snapshot.docs
+      .map(item=>item.data())
+      .filter(item=>item&&item.uid&&item.sessionId&&Number(item.activeUntilMs)>now)
+      .length;
   },
   async findOnlineBattlePair(){
     const user=await this.requireOnlineLogin();
@@ -4281,28 +4677,38 @@ window.firebaseBridge={
     if(!players.includes(user.uid))throw new Error("対戦情報が不正です。");
 
     const ref=doc(db,"onlineMatches",matchId);
+    const hostUid=players.slice().sort()[0];
 
-    // 重要:
-    // 以前は「存在確認のgetDoc → 無ければ作成」という順番だった。
-    // 未作成ドキュメントへのreadはSecurity Rulesで拒否されるため、
-    // 2人がマッチした瞬間に Missing or insufficient permissions が出ていた。
-    //
-    // matchId / cards / target は両クライアントで決定的に同じなので、
-    // 先にsetDocしてから読み取る。片方がcreate、もう片方がupdateになっても
-    // 同じ対戦データなので安全に同期できる。
-    await setDoc(ref,{
-      players,
-      names,
-      target:Math.max(1,Math.round(Number(target)||1)),
-      cards,
-      presence:Object.fromEntries(players.map(uid=>[uid,Date.now()])),
-      createdAtMs:Date.now(),
-      updatedAt:serverTimestamp()
-    },{merge:true});
+    // Only the deterministic host creates the match document.
+    // This avoids both clients racing to overwrite shared startup fields.
+    if(user.uid===hostUid){
+      await setDoc(ref,{
+        players,
+        names,
+        target:Math.max(1,Math.round(Number(target)||1)),
+        cards,
+        presence:Object.fromEntries(players.map(uid=>[uid,Date.now()])),
+        createdAt:serverTimestamp(),
+        createdAtMs:Date.now(),
+        updatedAt:serverTimestamp()
+      });
+    }
 
-    const snap=await getDoc(ref);
-    if(!snap.exists())throw new Error("対戦ルームを作成できませんでした。");
-    return snap.data();
+    // Non-host may briefly get permission-denied before the document exists,
+    // because the rules cannot inspect resource.data.players on a missing doc.
+    // Retry until the host-created participant document becomes readable.
+    const deadline=Date.now()+10000;
+    while(Date.now()<deadline){
+      try{
+        const snap=await getDoc(ref);
+        if(snap.exists())return snap.data();
+      }catch(error){
+        // Expected for a few hundred ms before host creation.
+      }
+      await new Promise(resolve=>setTimeout(resolve,120));
+    }
+
+    throw new Error("対戦ルームの同期に失敗しました。");
   },
   async submitOnlineBattleResult(matchId,result){
     const user=await this.requireOnlineLogin();
@@ -4340,13 +4746,10 @@ window.firebaseBridge={
     if(!snap.exists()||!Array.isArray(snap.data().players)||!snap.data().players.includes(user.uid)){
       throw new Error("対戦ルームが見つかりません。");
     }
-    await setDoc(matchRef,{
-      presence:{
-        ...(snap.data().presence||{}),
-        [user.uid]:Date.now()
-      },
+    await updateDoc(matchRef,{
+      [`presence.${user.uid}`]:Date.now(),
       updatedAt:serverTimestamp()
-    },{merge:true});
+    });
   },
   async getOnlineBattleStatus(matchId){
     const user=await this.requireOnlineLogin();
@@ -4801,6 +5204,152 @@ window.firebaseBridge={
 }
 @media (prefers-reduced-motion: reduce){
   .online-optimal-pulse,.online-optimal-ring{animation:none}
+}
+</style>
+
+
+<style id="online-ready-sync-v18">
+.online-sync-overlay{
+  position:fixed;
+  inset:0;
+  z-index:999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(5,10,18,.82);
+  backdrop-filter:blur(5px);
+}
+.online-sync-overlay.hidden{display:none}
+.online-sync-card{
+  min-width:min(340px,90vw);
+  padding:28px 24px;
+  border:1px solid #405476;
+  border-radius:18px;
+  background:#101a2b;
+  text-align:center;
+}
+.online-sync-card small{
+  display:block;
+  margin-bottom:10px;
+  color:#7ca7ff;
+  font-weight:900;
+  letter-spacing:.16em;
+}
+.online-sync-card strong{
+  display:block;
+  font-size:64px;
+  line-height:1;
+  color:#eef4ff;
+}
+.online-sync-card span{
+  display:block;
+  margin-top:12px;
+  color:#9aa9c0;
+  font-size:13px;
+}
+</style>
+
+
+<style id="online-waiting-count-v23">
+#onlineWaitingCount.online-waiting-count{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  width:max-content;
+  margin-top:8px;
+  padding:5px 9px;
+  border:1px solid rgba(124,167,255,.34);
+  border-radius:999px;
+  background:rgba(124,167,255,.10);
+  color:#b6ceff;
+  font-size:12px;
+  font-weight:900;
+  line-height:1.2;
+}
+</style>
+
+
+<style id="online-countdown-player-info-v25">
+.online-sync-card{
+  width:min(560px,94vw);
+}
+.online-sync-versus{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  gap:12px;
+  align-items:center;
+  margin:4px 0 20px;
+}
+.online-sync-player{
+  min-width:0;
+  padding:12px 10px;
+  border:1px solid #344766;
+  border-radius:13px;
+  background:#0c1625;
+  display:grid;
+  gap:3px;
+}
+.online-sync-side{
+  color:#7ca7ff !important;
+  font-size:9px !important;
+  font-weight:900;
+  letter-spacing:.12em;
+}
+.online-sync-player strong{
+  display:block !important;
+  font-size:17px !important;
+  line-height:1.2 !important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.online-sync-player span:not(.online-sync-side){
+  margin:0 !important;
+  color:#d8e4f7 !important;
+  font-size:12px !important;
+}
+.online-sync-player b{
+  color:#9fb9e8;
+  font-size:11px;
+}
+.online-sync-vs{
+  color:#7ca7ff;
+  font-weight:950;
+  font-size:16px;
+}
+@media(max-width:600px){
+  .online-sync-card{
+    width:min(94vw,460px);
+    padding:22px 14px;
+  }
+  .online-sync-versus{
+    gap:7px;
+    margin-bottom:16px;
+  }
+  .online-sync-player{
+    padding:10px 7px;
+  }
+  .online-sync-player strong{
+    font-size:14px !important;
+  }
+  .online-sync-player span:not(.online-sync-side){
+    font-size:11px !important;
+  }
+  .online-sync-player b{
+    font-size:10px;
+  }
+}
+</style>
+
+
+<style id="online-card-click-stability-v28">
+#onlineCards .cardbtn > *{
+  pointer-events:none;
+}
+#onlineCards .cardbtn{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
 </style>
 
